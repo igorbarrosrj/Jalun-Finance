@@ -1,0 +1,27 @@
+jalun.com.br {
+	reverse_proxy web:3000
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+api.jalun.com.br {
+	reverse_proxy api:3001
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}
+
+# Bloqueia acesso direto pelo IP
+http://148.230.73.170 {
+	respond "Acesso direto não permitido" 403
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
+import { LogoutButton } from "@/components/logout-button"
 
 interface Processo {
   id: number
@@ -84,7 +85,7 @@ export default function DashboardPage() {
             <span className="text-gray-200">/</span>
             <span className="text-sm font-medium">Dashboard</span>
           </div>
-          {/* TODO: autenticação */}
+          <LogoutButton />
         </div>
       </header>
 

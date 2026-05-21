@@ -12,13 +12,16 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "seed:admin": "tsx prisma/seed-admin.ts",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@credor-radar/shared": "*",
     "@prisma/client": "^5.22.0",
+    "bcryptjs": "^3.0.3",
     "bullmq": "^5.34.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -27,16 +30,16 @@
     "pdf-parse": "^1.1.1",
     "pino": "^9.5.0",
     "playwright": "^1.49.1",
-    "zod": "^3.23.8",
-    "@credor-radar/shared": "*"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^20.17.9",
     "@types/pdf-parse": "^1.1.4",
-    "prisma": "^5.22.0",
     "pino-pretty": "^13.0.0",
+    "prisma": "^5.22.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

@@ -28,6 +28,7 @@ model Processo {
   ajId                    Int                   @map("aj_id")
   numeroProcesso          String                @unique @map("numero_processo")
   tipo                    String?
+  subtipo                 String?
   recuperandaRazaoSocial  String?               @map("recuperanda_razao_social")
   recuperandaCnpj         String?               @map("recuperanda_cnpj")
   vara                    String?
@@ -78,6 +79,7 @@ model ListaCredores {
   totalClasse4    Decimal?   @map("total_classe_4") @db.Decimal(15, 2)
   totalGeral      Decimal?   @map("total_geral") @db.Decimal(15, 2)
   qtdCredores     Int?       @map("qtd_credores")
+  qualidadeBaixa  Boolean    @default(false) @map("qualidade_baixa")
   rawJson         Json?      @map("raw_json")
   extraidoEm      DateTime   @default(now()) @map("extraido_em")
   credores        Credor[]
@@ -86,25 +88,73 @@ model ListaCredores {
 }
 
 model Credor {
-  id                   Int            @id @default(autoincrement())
-  lista                ListaCredores  @relation(fields: [listaId], references: [id])
-  listaId              Int            @map("lista_id")
-  processo             Processo       @relation(fields: [processoId], references: [id])
-  processoId           Int            @map("processo_id")
+  id                   Int              @id @default(autoincrement())
+  lista                ListaCredores    @relation(fields: [listaId], references: [id])
+  listaId              Int              @map("lista_id")
+  processo             Processo         @relation(fields: [processoId], references: [id])
+  processoId           Int              @map("processo_id")
   nome                 String
   documento            String?
-  tipoPessoa           String?        @map("tipo_pessoa")
-  valor                Decimal        @db.Decimal(15, 2)
-  moeda                String         @default("BRL")
+  tipoPessoa           String?          @map("tipo_pessoa")
+  valor                Decimal          @db.Decimal(15, 2)
+  moeda                String           @default("BRL")
   classe               String
-  posicaoLista         Int?           @map("posicao_lista")
-  recuperacaoEsperada  Decimal?       @map("recuperacao_esperada") @db.Decimal(15, 2)
-  precoAlvoCompra      Decimal?       @map("preco_alvo_compra") @db.Decimal(15, 2)
-  score                Decimal?       @db.Decimal(8, 4)
-  scoreMotivos         String?        @map("score_motivos") @db.Text
+  cessivel             Boolean          @default(true)
+  posicaoLista         Int?             @map("posicao_lista")
+  recuperacaoEsperada  Decimal?         @map("recuperacao_esperada") @db.Decimal(15, 2)
+  precoAlvoCompra      Decimal?         @map("preco_alvo_compra") @db.Decimal(15, 2)
+  score                Decimal?         @db.Decimal(8, 4)
+  scoreMotivos         String?          @map("score_motivos") @db.Text
+  favoritos            CredorFavorito[]
 
   @@index([score(sort: Desc)])
   @@index([classe])
   @@index([valor(sort: Desc)])
+  @@index([cessivel])
   @@map("credores")
+}
+
+model Usuario {
+  id          Int              @id @default(autoincrement())
+  email       String           @unique
+  nome        String
+  senhaHash   String           @map("senha_hash")
+  papel       String           @default("viewer")
+  ativo       Boolean          @default(true)
+  criadoEm   DateTime         @default(now()) @map("criado_em")
+  ultimoLogin DateTime?        @map("ultimo_login")
+  favoritos   CredorFavorito[]
+  alertas     AlertaConfig[]
+
+  @@map("usuarios")
+}
+
+model CredorFavorito {
+  id        Int      @id @default(autoincrement())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioId Int      @map("usuario_id")
+  credor    Credor   @relation(fields: [credorId], references: [id])
+  credorId  Int      @map("credor_id")
+  notas     String?  @db.Text
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([usuarioId, credorId])
+  @@map("credores_favoritos")
+}
+
+model AlertaConfig {
+  id          Int      @id @default(autoincrement())
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioId   Int      @map("usuario_id")
+  scoreMinimo Decimal? @map("score_minimo") @db.Decimal(4, 2)
+  valorMinimo Decimal? @map("valor_minimo") @db.Decimal(15, 2)
+  valorMaximo Decimal? @map("valor_maximo") @db.Decimal(15, 2)
+  classes     String[] @default([])
+  estados     String[] @default([])
+  canal       String   @default("email")
+  webhookUrl  String?  @map("webhook_url")
+  ativo       Boolean  @default(true)
+  criadoEm   DateTime @default(now()) @map("criado_em")
+
+  @@map("alertas_config")
 }
