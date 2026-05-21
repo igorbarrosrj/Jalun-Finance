@@ -4,6 +4,8 @@ import { extrairTextoPdf } from "../lib/pdf"
 import { extrairListaCredores } from "../extractors/claude"
 import { logger } from "../lib/logger"
 import { Decimal } from "@prisma/client/runtime/library"
+import { ehCredorNaoCessivel } from "../scoring/filtros"
+import { classificarTipoPessoa } from "../lib/classificarCredor"
 
 export const extractJobHandler = async (job: Job<{ documentoId: number }>): Promise<void> => {
   const { documentoId } = job.data
@@ -28,10 +30,7 @@ export const extractJobHandler = async (job: Job<{ documentoId: number }>): Prom
     if (!resultado.success || !resultado.data) {
       await prisma.documento.update({
         where: { id: documentoId },
-        data: {
-          extraido: false,
-          erroExtracao: resultado.erro ?? "Extração falhou",
-        },
+        data: { extraido: false, erroExtracao: resultado.erro ?? "Extração falhou" },
       })
       return
     }
@@ -53,27 +52,51 @@ export const extractJobHandler = async (job: Job<{ documentoId: number }>): Prom
       },
     })
 
+    let naoCessiveisCount = 0
     for (const c of data.credores) {
+      const valor = c.valor
+      const filtro = ehCredorNaoCessivel(c.nome, valor)
+      const tipoPessoa = classificarTipoPessoa(c.nome, c.documento ?? null)
+
       await prisma.credor.create({
         data: {
           listaId: lista.id,
           processoId: doc.processoId,
           nome: c.nome,
           documento: c.documento,
-          valor: new Decimal(c.valor),
+          valor: new Decimal(valor),
           moeda: c.moeda,
           classe: c.classe,
           posicaoLista: c.posicao_lista,
+          cessivel: filtro.cessivel,
+          tipoPessoa,
+          score: filtro.cessivel ? null : new Decimal(0),
+          scoreMotivos: filtro.cessivel
+            ? null
+            : `Crédito não cessível: ${(filtro as { cessivel: false; motivo: string }).motivo}`,
         },
       })
+
+      if (!filtro.cessivel) naoCessiveisCount++
     }
+
+    const qualidadeBaixa =
+      data.credores.length > 0 && naoCessiveisCount / data.credores.length > 0.8
+
+    await prisma.listaCredores.update({
+      where: { id: lista.id },
+      data: { qualidadeBaixa },
+    })
 
     await prisma.documento.update({
       where: { id: documentoId },
       data: { extraido: true, erroExtracao: null },
     })
 
-    logger.info({ documentoId, credores: data.credores.length, listaId: lista.id }, "Extração concluída")
+    logger.info(
+      { documentoId, credores: data.credores.length, cessiveisNao: naoCessiveisCount, qualidadeBaixa, listaId: lista.id },
+      "Extração concluída"
+    )
   } catch (err) {
     const msg = (err as Error).message
     await prisma.documento.update({

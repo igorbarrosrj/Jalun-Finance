@@ -12,6 +12,7 @@ interface Credor {
   valor: string
   moeda: string
   classe: string
+  cessivel: boolean
   posicaoLista: number | null
   score: string | null
   scoreMotivos: string | null
@@ -23,6 +24,7 @@ interface Processo {
   id: number
   numeroProcesso: string
   tipo: string | null
+  subtipo: string | null
   recuperandaRazaoSocial: string | null
   vara: string | null
   comarca: string | null
@@ -32,17 +34,26 @@ interface Processo {
   status: string
   aj: { nome: string; urlBase: string }
   documentos: Array<{ id: number; tipoDocumento: string | null; nomeArquivo: string | null; extraido: boolean }>
+  listas: Array<{ id: number; qualidadeBaixa: boolean; qtdCredores: number | null; totalGeral: string | null }>
   credores: Credor[]
 }
 
 const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4000"
 
 const CLASSES: Record<string, string> = {
-  I_trabalhista: "Classe I — Trabalhista",
-  II_garantia_real: "Classe II — Garantia Real",
-  III_quirografario: "Classe III — Quirografário",
-  IV_me_epp: "Classe IV — ME/EPP",
-  extraconcursal: "Extraconcursal",
+  I_trabalhista:    "I — Trabalhista",
+  II_garantia_real: "II — Garantia Real",
+  III_quirografario:"III — Quirografário",
+  IV_me_epp:        "IV — ME/EPP",
+  extraconcursal:   "Extraconcursal",
+}
+
+const SUBTIPO_LABEL: Record<string, string> = {
+  recuperacao_judicial_ativa:  "RJ ativa",
+  recuperacao_judicial_antiga: "RJ antiga",
+  falencia_ativa:              "Falência ativa",
+  falencia_antiga:             "Falência antiga",
+  extrajudicial:               "Extrajudicial",
 }
 
 function formatBRL(v: string | null): string {
@@ -66,12 +77,13 @@ function scoreColor(s: string | null): string {
 }
 
 function exportCSV(credores: Credor[], processo: Processo) {
-  const header = ["Posição", "Nome", "Documento", "Classe", "Valor (BRL)", "Score", "Recuperação Esperada", "Preço-Alvo"]
+  const header = ["Posição","Nome","Documento","Classe","Cessível","Valor (BRL)","Score","Rec. Esperada","Preço-Alvo"]
   const rows = credores.map((c) => [
     c.posicaoLista ?? "",
     `"${c.nome}"`,
     c.documento ?? "",
     CLASSES[c.classe] ?? c.classe,
+    c.cessivel ? "Sim" : "Não",
     parseFloat(c.valor).toFixed(2),
     c.score ? parseFloat(c.score).toFixed(4) : "",
     c.recuperacaoEsperada ? parseFloat(c.recuperacaoEsperada).toFixed(2) : "",
@@ -94,6 +106,7 @@ export default function ProcessoDetalhePage() {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [filtroClasse, setFiltroClasse] = useState("")
+  const [mostrarNaoCessiveis, setMostrarNaoCessiveis] = useState(false)
 
   useEffect(() => {
     fetch(`${API_URL}/api/processos/${id}`)
@@ -103,16 +116,31 @@ export default function ProcessoDetalhePage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">Carregando...</div>
-  if (erro || !processo) return <div className="min-h-screen flex items-center justify-center text-red-500">{erro ?? "Não encontrado"}</div>
+  if (loading) return (
+    <div className="min-h-screen bg-white">
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />
+        ))}
+      </div>
+    </div>
+  )
+  if (erro || !processo) return (
+    <div className="min-h-screen flex items-center justify-center text-red-500">{erro ?? "Não encontrado"}</div>
+  )
 
-  const credoresFiltrados = filtroClasse
-    ? processo.credores.filter((c) => c.classe === filtroClasse)
-    : processo.credores
+  const qualidadeBaixa = processo.listas.some((l) => l.qualidadeBaixa)
+
+  const credoresFiltrados = processo.credores.filter((c) => {
+    if (!mostrarNaoCessiveis && !c.cessivel) return false
+    if (filtroClasse && c.classe !== filtroClasse) return false
+    return true
+  })
+
+  const cessiveis = processo.credores.filter((c) => c.cessivel)
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
       <header className="border-b border-gray-100 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center gap-3">
           <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">Credor Radar</Link>
@@ -133,10 +161,10 @@ export default function ProcessoDetalhePage() {
               </h1>
               <p className="mt-1 text-sm text-gray-500 font-mono">{processo.numeroProcesso}</p>
             </div>
-            <div className="flex gap-2">
-              {processo.tipo && (
+            <div className="flex gap-2 flex-wrap justify-end">
+              {processo.subtipo && (
                 <span className="inline-flex rounded-md px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-800">
-                  {processo.tipo}
+                  {SUBTIPO_LABEL[processo.subtipo] ?? processo.subtipo}
                 </span>
               )}
               <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${
@@ -170,6 +198,14 @@ export default function ProcessoDetalhePage() {
           )}
         </div>
 
+        {/* Alerta qualidade baixa */}
+        {qualidadeBaixa && (
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <span className="text-base">⚠️</span>
+            <span>Lista predominantemente tributária — pouco valor para cessão privada. A maioria dos créditos é de Fazenda Pública ou INSS.</span>
+          </div>
+        )}
+
         {/* Documentos */}
         {processo.documentos.length > 0 && (
           <div>
@@ -190,11 +226,21 @@ export default function ProcessoDetalhePage() {
 
         {/* Credores */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h2 className="text-sm font-semibold text-gray-700">
-              Credores ({credoresFiltrados.length} de {processo.credores.length})
+              Credores ({credoresFiltrados.length} exibidos · {cessiveis.length} cessíveis de {processo.credores.length})
             </h2>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={mostrarNaoCessiveis}
+                  onChange={(e) => setMostrarNaoCessiveis(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Mostrar não-cessíveis
+              </label>
+
               <select
                 value={filtroClasse}
                 onChange={(e) => setFiltroClasse(e.target.value)}
@@ -205,6 +251,7 @@ export default function ProcessoDetalhePage() {
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
+
               {processo.credores.length > 0 && (
                 <button
                   onClick={() => exportCSV(credoresFiltrados, processo)}
@@ -226,7 +273,7 @@ export default function ProcessoDetalhePage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {["#", "Nome", "Documento", "Classe", "Valor", "Score", "Rec. Esperada", "Preço-Alvo"].map((h) => (
+                    {["#","Nome","Tipo","Classe","Valor","Score","Rec. Esperada","Preço-Alvo"].map((h) => (
                       <th key={h} className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">
                         {h}
                       </th>
@@ -235,12 +282,15 @@ export default function ProcessoDetalhePage() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {credoresFiltrados.map((c) => (
-                    <tr key={c.id} className="hover:bg-gray-50">
+                    <tr key={c.id} className={`hover:bg-gray-50 ${!c.cessivel ? "opacity-50" : ""}`}>
                       <td className="px-3 py-2.5 text-gray-400 tabular-nums">{c.posicaoLista ?? "—"}</td>
                       <td className="px-3 py-2.5 font-medium text-gray-900 max-w-xs">
                         <div className="line-clamp-1">{c.nome}</div>
+                        {!c.cessivel && (
+                          <div className="text-xs text-amber-600">{c.scoreMotivos?.replace("Crédito não cessível: ", "")}</div>
+                        )}
                       </td>
-                      <td className="px-3 py-2.5 font-mono text-xs text-gray-500">{c.documento ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-500">{c.tipoPessoa ?? "—"}</td>
                       <td className="px-3 py-2.5">
                         <span className="inline-flex rounded px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600">
                           {c.classe.split("_")[0]}
@@ -248,7 +298,7 @@ export default function ProcessoDetalhePage() {
                       </td>
                       <td className="px-3 py-2.5 tabular-nums font-medium">{formatBRL(c.valor)}</td>
                       <td className={`px-3 py-2.5 tabular-nums ${scoreColor(c.score)}`}>
-                        {c.score ? parseFloat(c.score).toFixed(3) : "—"}
+                        {c.cessivel && c.score ? parseFloat(c.score).toFixed(3) : "—"}
                       </td>
                       <td className="px-3 py-2.5 tabular-nums text-gray-600">{formatBRL(c.recuperacaoEsperada)}</td>
                       <td className="px-3 py-2.5 tabular-nums text-gray-600">{formatBRL(c.precoAlvoCompra)}</td>

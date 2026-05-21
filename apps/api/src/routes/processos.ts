@@ -5,25 +5,31 @@ import { prisma } from "../lib/db"
 export const processosRouter = Router()
 
 const FiltrosSchema = z.object({
-  estado:    z.string().optional(),
-  tipo:      z.string().optional(),
-  pagina:    z.coerce.number().min(1).default(1),
-  por_pagina: z.coerce.number().min(1).max(100).default(20),
-  ordenar:   z.enum(["score", "valor", "dataDistribuicao", "dataDeferimento"]).optional(),
-  ordem:     z.enum(["asc", "desc"]).default("desc"),
+  estado:         z.string().optional(),
+  tipo:           z.string().optional(),
+  subtipo:        z.string().optional(),
+  incluir_antigos: z.coerce.boolean().default(false),
+  pagina:         z.coerce.number().min(1).default(1),
+  por_pagina:     z.coerce.number().min(1).max(100).default(20),
+  ordem:          z.enum(["asc", "desc"]).default("desc"),
 })
 
 processosRouter.get("/", async (req, res) => {
   const parsed = FiltrosSchema.safeParse(req.query)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
 
-  const { estado, tipo, pagina, por_pagina, ordem } = parsed.data
+  const { estado, tipo, subtipo, incluir_antigos, pagina, por_pagina, ordem } = parsed.data
   const skip = (pagina - 1) * por_pagina
 
   try {
-    const where = {
-      ...(estado ? { estado } : {}),
-      ...(tipo ? { tipo } : {}),
+    const where: Record<string, unknown> = {}
+    if (estado) where["estado"] = estado
+    if (tipo) where["tipo"] = tipo
+    if (subtipo) {
+      where["subtipo"] = subtipo
+    } else if (!incluir_antigos) {
+      // padrão: só RJ ativas e falências ativas recentes
+      where["subtipo"] = { in: ["recuperacao_judicial_ativa", "recuperacao_judicial_antiga"] }
     }
 
     const [processos, total] = await Promise.all([
@@ -31,13 +37,17 @@ processosRouter.get("/", async (req, res) => {
         where,
         skip,
         take: por_pagina,
-        orderBy: { descobertoEm: ordem },
+        orderBy: { dataDeferimento: ordem },
         include: {
           aj: { select: { nome: true } },
           _count: { select: { credores: true, documentos: true } },
-          listas: { select: { totalGeral: true, qtdCredores: true }, take: 1, orderBy: { extraidoEm: "desc" } },
+          listas: {
+            select: { totalGeral: true, qtdCredores: true, qualidadeBaixa: true },
+            take: 1,
+            orderBy: { extraidoEm: "desc" },
+          },
           credores: {
-            where: { score: { not: null } },
+            where: { score: { not: null }, cessivel: true },
             orderBy: { score: "desc" },
             take: 3,
             select: { score: true },
@@ -51,6 +61,7 @@ processosRouter.get("/", async (req, res) => {
       id: p.id,
       numeroProcesso: p.numeroProcesso,
       tipo: p.tipo,
+      subtipo: p.subtipo,
       recuperandaRazaoSocial: p.recuperandaRazaoSocial,
       vara: p.vara,
       comarca: p.comarca,
@@ -63,6 +74,7 @@ processosRouter.get("/", async (req, res) => {
       totalCredores: p._count.credores,
       valorTotal: p.listas[0]?.totalGeral?.toString() ?? null,
       qtdCredoresLista: p.listas[0]?.qtdCredores ?? null,
+      qualidadeBaixa: p.listas[0]?.qualidadeBaixa ?? false,
       topScores: p.credores.map((c) => c.score?.toString()),
     }))
 
@@ -84,9 +96,7 @@ processosRouter.get("/:id", async (req, res) => {
         documentos: { orderBy: { baixadoEm: "desc" } },
         listas: {
           orderBy: { extraidoEm: "desc" },
-          include: {
-            credores: { orderBy: { score: "desc" } },
-          },
+          select: { id: true, qualidadeBaixa: true, qtdCredores: true, totalGeral: true, extraidoEm: true },
         },
         credores: {
           orderBy: { score: "desc" },
