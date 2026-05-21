@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: radar
+      POSTGRES_PASSWORD: radar
+      POSTGRES_DB: credor_radar
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      # Exposto somente para localhost — nunca 0.0.0.0 em produção
+      # Em produção via Dokploy, remova este bloco ports inteiro.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - credor-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radar -d credor_radar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      # Exposto somente para localhost — nunca 0.0.0.0 em produção
+      # Em produção via Dokploy, remova este bloco ports inteiro.
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - credor-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  credor-network:
+    driver: bridge
+    name: credor-radar-network
+
+volumes:
+  pgdata:
+    name: credor-radar-pgdata
+  redisdata:
+    name: credor-radar-redisdata

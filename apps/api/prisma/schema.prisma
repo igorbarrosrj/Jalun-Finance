@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AdministradorJudicial {
+  id              Int        @id @default(autoincrement())
+  nome            String
+  cnpj            String?
+  urlBase         String     @map("url_base")
+  urlIndice       String?    @map("url_indice")
+  estado          String?
+  ativo           Boolean    @default(true)
+  ultimaVarredura DateTime?  @map("ultima_varredura")
+  criadoEm        DateTime   @default(now()) @map("criado_em")
+  processos       Processo[]
+
+  @@map("administradores_judiciais")
+}
+
+model Processo {
+  id                      Int                   @id @default(autoincrement())
+  aj                      AdministradorJudicial @relation(fields: [ajId], references: [id])
+  ajId                    Int                   @map("aj_id")
+  numeroProcesso          String                @unique @map("numero_processo")
+  tipo                    String?
+  recuperandaRazaoSocial  String?               @map("recuperanda_razao_social")
+  recuperandaCnpj         String?               @map("recuperanda_cnpj")
+  vara                    String?
+  comarca                 String?
+  estado                  String?
+  dataDistribuicao        DateTime?             @map("data_distribuicao")
+  dataDeferimento         DateTime?             @map("data_deferimento")
+  urlPaginaAj             String?               @map("url_pagina_aj")
+  status                  String                @default("novo")
+  rawHtml                 String?               @map("raw_html") @db.Text
+  descobertoEm            DateTime              @default(now()) @map("descoberto_em")
+  atualizadoEm            DateTime?             @updatedAt @map("atualizado_em")
+  documentos              Documento[]
+  listas                  ListaCredores[]
+  credores                Credor[]
+
+  @@map("processos")
+}
+
+model Documento {
+  id              Int             @id @default(autoincrement())
+  processo        Processo        @relation(fields: [processoId], references: [id])
+  processoId      Int             @map("processo_id")
+  tipoDocumento   String?         @map("tipo_documento")
+  nomeArquivo     String?         @map("nome_arquivo")
+  urlPdf          String          @unique @map("url_pdf")
+  dataPublicacao  DateTime?       @map("data_publicacao")
+  hashArquivo     String?         @map("hash_arquivo")
+  caminhoLocal    String?         @map("caminho_local")
+  tamanhoBytes    Int?            @map("tamanho_bytes")
+  extraido        Boolean         @default(false)
+  erroExtracao    String?         @map("erro_extracao")
+  baixadoEm      DateTime        @default(now()) @map("baixado_em")
+  listas          ListaCredores[]
+
+  @@map("documentos")
+}
+
+model ListaCredores {
+  id              Int        @id @default(autoincrement())
+  processo        Processo   @relation(fields: [processoId], references: [id])
+  processoId      Int        @map("processo_id")
+  documento       Documento  @relation(fields: [documentoId], references: [id])
+  documentoId     Int        @map("documento_id")
+  totalClasse1    Decimal?   @map("total_classe_1") @db.Decimal(15, 2)
+  totalClasse2    Decimal?   @map("total_classe_2") @db.Decimal(15, 2)
+  totalClasse3    Decimal?   @map("total_classe_3") @db.Decimal(15, 2)
+  totalClasse4    Decimal?   @map("total_classe_4") @db.Decimal(15, 2)
+  totalGeral      Decimal?   @map("total_geral") @db.Decimal(15, 2)
+  qtdCredores     Int?       @map("qtd_credores")
+  rawJson         Json?      @map("raw_json")
+  extraidoEm      DateTime   @default(now()) @map("extraido_em")
+  credores        Credor[]
+
+  @@map("listas_credores")
+}
+
+model Credor {
+  id                   Int            @id @default(autoincrement())
+  lista                ListaCredores  @relation(fields: [listaId], references: [id])
+  listaId              Int            @map("lista_id")
+  processo             Processo       @relation(fields: [processoId], references: [id])
+  processoId           Int            @map("processo_id")
+  nome                 String
+  documento            String?
+  tipoPessoa           String?        @map("tipo_pessoa")
+  valor                Decimal        @db.Decimal(15, 2)
+  moeda                String         @default("BRL")
+  classe               String
+  posicaoLista         Int?           @map("posicao_lista")
+  recuperacaoEsperada  Decimal?       @map("recuperacao_esperada") @db.Decimal(15, 2)
+  precoAlvoCompra      Decimal?       @map("preco_alvo_compra") @db.Decimal(15, 2)
+  score                Decimal?       @db.Decimal(8, 4)
+  scoreMotivos         String?        @map("score_motivos") @db.Text
+
+  @@index([score(sort: Desc)])
+  @@index([classe])
+  @@index([valor(sort: Desc)])
+  @@map("credores")
+}
