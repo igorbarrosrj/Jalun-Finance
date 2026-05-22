@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: "Credor Radar — Inteligência em Recuperação Judicial",
   description:
     "Identificamos automaticamente oportunidades de cessão de crédito em processos de recuperação judicial no Brasil — antes do mercado.",
+  icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
   openGraph: {
     title: "Credor Radar — Inteligência em Recuperação Judicial",
     description: "Identificamos oportunidades de cessão de crédito em RJ antes do mercado.",
