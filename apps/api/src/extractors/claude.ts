@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { z } from "zod"
+import { jsonrepair } from "jsonrepair"
 import { logger } from "../lib/logger"
 import { chunkearTexto } from "../lib/pdf"
 
@@ -57,7 +58,8 @@ const ExtractionResultSchema = z.object({
   recuperandas: z.array(RecuperandaSchema),
   administrador_judicial: AdministradorSchema,
   credores: z.array(CredorSchema),
-  totais_por_classe: TotaisSchema,
+  // Opcional — recalculamos a partir dos credores se Claude truncar este campo
+  totais_por_classe: TotaisSchema.optional(),
 })
 
 const ErroSchema = z.object({
@@ -65,7 +67,29 @@ const ErroSchema = z.object({
   tipo_detectado: z.string().optional(),
 })
 
-export type ExtractionResult = z.infer<typeof ExtractionResultSchema>
+type ExtractionResultRaw = z.infer<typeof ExtractionResultSchema>
+export type ExtractionResult = Omit<ExtractionResultRaw, "totais_por_classe"> & {
+  totais_por_classe: { I: number; II: number; III: number; IV: number; extraconcursal: number }
+}
+
+function calcularTotais(credores: z.infer<typeof CredorSchema>[]): ExtractionResult["totais_por_classe"] {
+  const t = { I: 0, II: 0, III: 0, IV: 0, extraconcursal: 0 }
+  for (const c of credores) {
+    if (c.classe === "I_trabalhista") t.I += c.valor
+    else if (c.classe === "II_garantia_real") t.II += c.valor
+    else if (c.classe === "III_quirografario") t.III += c.valor
+    else if (c.classe === "IV_me_epp") t.IV += c.valor
+    else if (c.classe === "extraconcursal") t.extraconcursal += c.valor
+  }
+  return t
+}
+
+function normalizar(raw: ExtractionResultRaw): ExtractionResult {
+  return {
+    ...raw,
+    totais_por_classe: raw.totais_por_classe ?? calcularTotais(raw.credores),
+  }
+}
 export type CredorExtraido = z.infer<typeof CredorSchema>
 
 // ─── Prompt ──────────────────────────────────────────────────────────────────
@@ -79,7 +103,8 @@ REGRAS CRÍTICAS:
 2. Valores monetários em formato brasileiro (1.234,56 ou 1.234.567,89) devem ser convertidos para número decimal (1234.56 ou 1234567.89)
 3. Se um campo não estiver claro no documento, use null — NUNCA invente dados
 4. Documentos que NÃO sejam lista de credores devem retornar: {"erro": "tipo_documento_diferente", "tipo_detectado": "descreva o tipo"}
-5. Classes de credores: I_trabalhista, II_garantia_real, III_quirografario, IV_me_epp, extraconcursal`
+5. Classes de credores: I_trabalhista, II_garantia_real, III_quirografario, IV_me_epp, extraconcursal
+6. CRÍTICO: o JSON deve estar 100% completo — feche todos os arrays e objetos antes de terminar`
 
 const buildUserPrompt = (texto: string, contextoProcesso?: string): string => {
   const ctx = contextoProcesso ? `\n\nContexto do processo: ${contextoProcesso}` : ""
@@ -119,7 +144,7 @@ ${texto}`
 const extrairChunk = async (texto: string, contexto?: string): Promise<unknown> => {
   const message = await client.messages.create({
     model: "claude-sonnet-4-5",
-    max_tokens: 8000,
+    max_tokens: 16000,
     temperature: 0,
     system: SYSTEM_PROMPT,
     messages: [
@@ -130,14 +155,34 @@ const extrairChunk = async (texto: string, contexto?: string): Promise<unknown> 
   const content = message.content[0]
   if (content.type !== "text") throw new Error("Resposta inesperada do Claude")
 
-  try {
-    return JSON.parse(content.text.trim())
-  } catch {
-    // Tentar extrair JSON de dentro de markdown ou texto extra
-    const jsonMatch = content.text.match(/\{[\s\S]+\}/m)
-    if (jsonMatch) return JSON.parse(jsonMatch[0])
-    throw new Error(`Claude retornou texto não-JSON: ${content.text.substring(0, 200)}`)
+  const raw = content.text.trim()
+
+  // 1. parse direto
+  try { return JSON.parse(raw) } catch { /* tenta reparar */ }
+
+  // 2. extrair bloco JSON se Claude embrulhou em markdown
+  const block = raw.match(/```(?:json)?\s*([\s\S]+?)\s*```/)
+  if (block) {
+    try { return JSON.parse(block[1]) } catch { /* segue */ }
   }
+
+  // 3. jsonrepair — corrige truncamento e erros menores do LLM
+  try {
+    const repaired = jsonrepair(raw)
+    logger.warn({ originalLen: raw.length, repairedLen: repaired.length }, "JSON reparado pelo jsonrepair")
+    return JSON.parse(repaired)
+  } catch { /* segue */ }
+
+  // 4. extrair o primeiro objeto completo encontrado via regex
+  const jsonMatch = raw.match(/\{[\s\S]+\}/)
+  if (jsonMatch) {
+    try {
+      const repaired = jsonrepair(jsonMatch[0])
+      return JSON.parse(repaired)
+    } catch { /* segue */ }
+  }
+
+  throw new Error(`Claude retornou texto não-parsável: ${raw.substring(0, 300)}`)
 }
 
 // ─── Merge de chunks ─────────────────────────────────────────────────────────
@@ -202,8 +247,9 @@ export const extrairListaCredores = async (
         return { success: false, erro: `Validação falhou: ${parsed.error.message}` }
       }
 
-      logger.info({ credores: parsed.data.credores.length }, "Extração concluída com sucesso")
-      return { success: true, data: parsed.data }
+      const data = normalizar(parsed.data)
+      logger.info({ credores: data.credores.length }, "Extração concluída com sucesso")
+      return { success: true, data }
     }
 
     // PDF grande: processar em chunks
@@ -212,7 +258,7 @@ export const extrairListaCredores = async (
       logger.info({ chunk: i + 1, total: chunks.length }, "Processando chunk")
       const raw = await extrairChunk(chunks[i], contextoProcesso)
       const parsed = ExtractionResultSchema.safeParse(raw)
-      if (parsed.success) resultados.push(parsed.data)
+      if (parsed.success) resultados.push(normalizar(parsed.data))
     }
 
     if (resultados.length === 0) return { success: false, erro: "Nenhum chunk retornou dados válidos" }
