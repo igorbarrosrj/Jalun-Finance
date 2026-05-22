@@ -1,3 +1,4 @@
+import type { ScraperAJ, ScraperResult } from "./tipos"
 import { chromium } from "playwright"
 import { createHash } from "crypto"
 import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs"
@@ -199,104 +200,109 @@ const parseProcesso = (raw: ProcessoRaw) => {
   }
 }
 
-export const scrapeAjRuiz = async (): Promise<void> => {
-  const aj = await prisma.administradorJudicial.findFirst({ where: { urlBase: BASE_URL } })
-  if (!aj) throw new Error("AJ Ruiz não encontrado — rode: npm run db:seed")
+export class AjRuizScraper implements ScraperAJ {
+  readonly urlBase = BASE_URL
 
-  const storagePath = process.env["STORAGE_PATH"] ?? "./storage"
-  mkdirSync(storagePath, { recursive: true })
+  async run(): Promise<ScraperResult> {
+    const aj = await prisma.administradorJudicial.findFirst({ where: { urlBase: BASE_URL } })
+    if (!aj) throw new Error("AJ Ruiz não encontrado — rode: npm run db:seed")
 
-  const processosRaw = await extrairProcessosDaPagina(storagePath)
+    const storagePath = process.env["STORAGE_PATH"] ?? "./storage"
+    mkdirSync(storagePath, { recursive: true })
 
-  let novos = 0, erros = 0, pdfsNovos = 0
+    const processosRaw = await extrairProcessosDaPagina(storagePath)
 
-  for (const raw of processosRaw) {
-    try {
-      const parsed = parseProcesso(raw)
-      if (!parsed.numeroProcesso) {
-        logger.warn({ nome: raw.nome.substring(0, 60) }, "Sem número de processo — pulando")
-        erros++
-        continue
-      }
+    let novos = 0, atualizados = 0, erros = 0, pdfsNovos = 0
 
-      const processo = await prisma.processo.upsert({
-        where: { numeroProcesso: parsed.numeroProcesso },
-        create: {
-          ajId: aj.id,
-          numeroProcesso: parsed.numeroProcesso,
-          tipo: raw.tipo,
-          recuperandaRazaoSocial: parsed.recuperandaRazaoSocial,
-          vara: parsed.vara,
-          comarca: parsed.comarca,
-          estado: parsed.estado,
-          dataDistribuicao: parsed.dataDistribuicao,
-          dataDeferimento: parsed.dataDeferimento,
-          urlPaginaAj: PROCESSOS_URL,
-          status: "scrapeado",
-        },
-        update: {
-          recuperandaRazaoSocial: parsed.recuperandaRazaoSocial,
-          vara: parsed.vara,
-          dataDeferimento: parsed.dataDeferimento,
-          status: "scrapeado",
-        },
-      })
-
-      logger.info(
-        { id: processo.id, numero: processo.numeroProcesso, empresa: parsed.recuperandaRazaoSocial?.substring(0, 40) },
-        "Processo salvo"
-      )
-      novos++
-
-      const pdfDir = path.join(storagePath, "pdfs", String(processo.id))
-      mkdirSync(pdfDir, { recursive: true })
-
-      for (const pdf of raw.pdfLinks) {
-        try {
-          const exists = await prisma.documento.findUnique({ where: { urlPdf: pdf.href } })
-          if (exists) continue
-
-          const tipoDoc = classificarDocumento(pdf.texto)
-          const tmpPath = path.join(pdfDir, `_tmp_${Date.now()}.pdf`)
-          logger.info({ url: pdf.href.substring(pdf.href.lastIndexOf("/") + 1), tipo: tipoDoc }, "Baixando PDF")
-
-          const tamanhoBytes = await downloadPdf(pdf.href, tmpPath)
-          const hashArquivo = createHash("sha256").update(readFileSync(tmpPath)).digest("hex")
-          const destPath = path.join(pdfDir, `${hashArquivo}.pdf`)
-          renameSync(tmpPath, destPath)
-
-          await prisma.documento.create({
-            data: {
-              processoId: processo.id,
-              tipoDocumento: tipoDoc,
-              nomeArquivo: path.basename(pdf.href),
-              urlPdf: pdf.href,
-              hashArquivo,
-              caminhoLocal: destPath,
-              tamanhoBytes,
-              extraido: false,
-            },
-          })
-          pdfsNovos++
-          await randomDelay()
-        } catch (pdfErr) {
-          logger.error({ err: (pdfErr as Error).message, url: pdf.href }, "Erro ao baixar PDF")
+    for (const raw of processosRaw) {
+      try {
+        const parsed = parseProcesso(raw)
+        if (!parsed.numeroProcesso) {
+          logger.warn({ nome: raw.nome.substring(0, 60) }, "Sem número de processo — pulando")
+          erros++
+          continue
         }
+
+        const existing = await prisma.processo.findUnique({ where: { numeroProcesso: parsed.numeroProcesso } })
+        const processo = await prisma.processo.upsert({
+          where: { numeroProcesso: parsed.numeroProcesso },
+          create: {
+            ajId: aj.id,
+            numeroProcesso: parsed.numeroProcesso,
+            tipo: raw.tipo,
+            recuperandaRazaoSocial: parsed.recuperandaRazaoSocial,
+            vara: parsed.vara,
+            comarca: parsed.comarca,
+            estado: parsed.estado,
+            dataDistribuicao: parsed.dataDistribuicao,
+            dataDeferimento: parsed.dataDeferimento,
+            urlPaginaAj: PROCESSOS_URL,
+            status: "scrapeado",
+          },
+          update: {
+            recuperandaRazaoSocial: parsed.recuperandaRazaoSocial,
+            vara: parsed.vara,
+            dataDeferimento: parsed.dataDeferimento,
+            status: "scrapeado",
+          },
+        })
+
+        if (existing) atualizados++; else novos++
+
+        const pdfDir = path.join(storagePath, "pdfs", String(processo.id))
+        mkdirSync(pdfDir, { recursive: true })
+
+        for (const pdf of raw.pdfLinks) {
+          try {
+            const exists = await prisma.documento.findUnique({ where: { urlPdf: pdf.href } })
+            if (exists) continue
+
+            const tipoDoc = classificarDocumento(pdf.texto)
+            const tmpPath = path.join(pdfDir, `_tmp_${Date.now()}.pdf`)
+            const tamanhoBytes = await downloadPdf(pdf.href, tmpPath)
+            const hashArquivo = createHash("sha256").update(readFileSync(tmpPath)).digest("hex")
+            const destPath = path.join(pdfDir, `${hashArquivo}.pdf`)
+            renameSync(tmpPath, destPath)
+
+            await prisma.documento.create({
+              data: {
+                processoId: processo.id,
+                tipoDocumento: tipoDoc,
+                nomeArquivo: path.basename(pdf.href),
+                urlPdf: pdf.href,
+                hashArquivo,
+                caminhoLocal: destPath,
+                tamanhoBytes,
+                extraido: false,
+              },
+            })
+            pdfsNovos++
+            await randomDelay()
+          } catch (pdfErr) {
+            logger.error({ err: (pdfErr as Error).message, url: pdf.href }, "Erro ao baixar PDF")
+          }
+        }
+      } catch (err) {
+        logger.error({ err: (err as Error).message, nome: raw.nome?.substring(0, 60) }, "Erro ao processar")
+        erros++
       }
-    } catch (err) {
-      logger.error({ err: (err as Error).message, nome: raw.nome?.substring(0, 60) }, "Erro ao processar")
-      erros++
+
+      await randomDelay()
     }
 
-    await randomDelay()
+    await prisma.administradorJudicial.update({
+      where: { id: aj.id },
+      data: { ultimaVarredura: new Date() },
+    })
+
+    logger.info({ novos, atualizados, erros, pdfsNovos }, "Scraping AJ Ruiz concluído")
+    return { novos, atualizados, erros, pdfsNovos }
   }
+}
 
-  await prisma.administradorJudicial.update({
-    where: { id: aj.id },
-    data: { ultimaVarredura: new Date() },
-  })
-
-  logger.info({ novos, erros, pdfsNovos }, "Scraping AJ Ruiz concluído")
+export const scrapeAjRuiz = async (): Promise<void> => {
+  const result = await new AjRuizScraper().run()
+  logger.info(result, "scrapeAjRuiz finalizado")
 }
 
 if (require.main === module) {
