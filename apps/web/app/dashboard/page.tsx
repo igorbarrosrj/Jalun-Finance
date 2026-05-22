@@ -95,7 +95,12 @@ export default function DashboardPage() {
             <span className="text-gray-200">/</span>
             <span className="text-sm font-medium">Dashboard</span>
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/favoritos" className="text-sm text-amber-500 hover:text-amber-600 transition-colors">
+              ★ Favoritos
+            </Link>
+            <LogoutButton />
+          </div>
         </div>
       </header>
 

@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { LogoutButton } from "@/components/logout-button"
 
 interface Credor {
   id: number
@@ -159,6 +160,7 @@ export default function ProcessoDetalhePage() {
   const [erro, setErro] = useState<string | null>(null)
   const [filtroClasse, setFiltroClasse] = useState("")
   const [mostrarNaoCessiveis, setMostrarNaoCessiveis] = useState(false)
+  const [favoritosSet, setFavoritosSet] = useState<Set<number>>(new Set())
 
   const indicadores = useIndicadores(processo)
 
@@ -169,6 +171,26 @@ export default function ProcessoDetalhePage() {
       .catch((e) => setErro((e as Error).message))
       .finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    fetch("/api/favoritos")
+      .then((r) => r.ok ? r.json() : [])
+      .then((favs: Array<{ credor: { id: number } }>) => {
+        setFavoritosSet(new Set(favs.map((f) => f.credor.id)))
+      })
+      .catch(() => {})
+  }, [])
+
+  const toggleFavorito = useCallback(async (credorId: number) => {
+    const isFav = favoritosSet.has(credorId)
+    if (isFav) {
+      await fetch(`/api/favoritos/${credorId}`, { method: "DELETE" })
+      setFavoritosSet((s) => { const n = new Set(s); n.delete(credorId); return n })
+    } else {
+      await fetch("/api/favoritos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ credorId }) })
+      setFavoritosSet((s) => new Set(s).add(credorId))
+    }
+  }, [favoritosSet])
 
   if (loading) return (
     <div className="min-h-screen bg-white">
@@ -196,12 +218,20 @@ export default function ProcessoDetalhePage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-100 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center gap-3">
-          <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">Credor Radar</Link>
-          <span className="text-gray-200">/</span>
-          <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-900">Dashboard</Link>
-          <span className="text-gray-200">/</span>
-          <span className="text-sm font-medium text-gray-700 font-mono">{processo.numeroProcesso}</span>
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">Credor Radar</Link>
+            <span className="text-gray-200">/</span>
+            <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-900">Dashboard</Link>
+            <span className="text-gray-200">/</span>
+            <span className="text-sm font-medium text-gray-700 font-mono">{processo.numeroProcesso}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/favoritos" className="text-sm text-amber-500 hover:text-amber-600 transition-colors" title="Meus favoritos">
+              ★ Favoritos
+            </Link>
+            <LogoutButton />
+          </div>
         </div>
       </header>
 
@@ -407,7 +437,7 @@ export default function ProcessoDetalhePage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {["#","Nome","Tipo","Classe","Valor","Score v2","Rec. Esperada","Preço-Alvo"].map((h) => (
+                    {["★","#","Nome","Tipo","Classe","Valor","Score v2","Rec. Esperada","Preço-Alvo"].map((h) => (
                       <th key={h} className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">
                         {h}
                       </th>
@@ -417,6 +447,19 @@ export default function ProcessoDetalhePage() {
                 <tbody className="divide-y divide-gray-50">
                   {credoresFiltrados.map((c) => (
                     <tr key={c.id} className={`hover:bg-gray-50 ${!c.cessivel ? "opacity-40" : ""}`}>
+                      <td className="px-3 py-2.5">
+                        {c.cessivel && (
+                          <button
+                            onClick={() => toggleFavorito(c.id)}
+                            className={`text-base transition-colors ${
+                              favoritosSet.has(c.id) ? "text-amber-400 hover:text-gray-300" : "text-gray-200 hover:text-amber-400"
+                            }`}
+                            title={favoritosSet.has(c.id) ? "Remover favorito" : "Adicionar favorito"}
+                          >
+                            ★
+                          </button>
+                        )}
+                      </td>
                       <td className="px-3 py-2.5 text-gray-400 tabular-nums text-xs">{c.posicaoLista ?? "—"}</td>
                       <td className="px-3 py-2.5 max-w-xs">
                         <div className="font-medium text-gray-900 line-clamp-1">{c.nome}</div>
