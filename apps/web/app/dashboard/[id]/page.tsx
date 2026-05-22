@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 
@@ -34,18 +34,18 @@ interface Processo {
   status: string
   aj: { nome: string; urlBase: string }
   documentos: Array<{ id: number; tipoDocumento: string | null; nomeArquivo: string | null; extraido: boolean }>
-  listas: Array<{ id: number; qualidadeBaixa: boolean; qtdCredores: number | null; totalGeral: string | null }>
+  listas: Array<{ id: number; qualidadeBaixa: boolean; qtdCredores: number | null }>
   credores: Credor[]
 }
 
 const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4000"
 
 const CLASSES: Record<string, string> = {
-  I_trabalhista:    "I — Trabalhista",
-  II_garantia_real: "II — Garantia Real",
-  III_quirografario:"III — Quirografário",
-  IV_me_epp:        "IV — ME/EPP",
-  extraconcursal:   "Extraconcursal",
+  I_trabalhista:     "I — Trabalhista",
+  II_garantia_real:  "II — Garantia Real",
+  III_quirografario: "III — Quirografário",
+  IV_me_epp:         "IV — ME/EPP",
+  extraconcursal:    "Extraconcursal",
 }
 
 const SUBTIPO_LABEL: Record<string, string> = {
@@ -56,11 +56,25 @@ const SUBTIPO_LABEL: Record<string, string> = {
   extrajudicial:               "Extrajudicial",
 }
 
-function formatBRL(v: string | null): string {
-  if (!v) return "—"
-  const n = parseFloat(v)
+const CLASSE_CORES: Record<string, string> = {
+  I_trabalhista:     "bg-blue-400",
+  II_garantia_real:  "bg-purple-400",
+  III_quirografario: "bg-amber-400",
+  IV_me_epp:         "bg-emerald-400",
+  extraconcursal:    "bg-gray-400",
+}
+
+function formatBRL(v: string | number | null): string {
+  if (v === null || v === undefined) return "—"
+  const n = typeof v === "number" ? v : parseFloat(v)
   if (isNaN(n)) return "—"
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n)
+}
+
+function formatBRLCompact(n: number): string {
+  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `R$ ${(n / 1_000).toFixed(0)}K`
+  return `R$ ${n.toFixed(0)}`
 }
 
 function formatData(d: string | null): string {
@@ -68,11 +82,16 @@ function formatData(d: string | null): string {
   return new Date(d).toLocaleDateString("pt-BR")
 }
 
+function mesesDesde(d: string | null): number | null {
+  if (!d) return null
+  return (Date.now() - new Date(d).getTime()) / (1000 * 60 * 60 * 24 * 30.44)
+}
+
 function scoreColor(s: string | null): string {
   if (!s) return "text-gray-300"
   const n = parseFloat(s)
-  if (n >= 0.3) return "text-emerald-600 font-semibold"
-  if (n >= 0.15) return "text-amber-600"
+  if (n >= 0.45) return "text-emerald-600 font-semibold"
+  if (n >= 0.25) return "text-amber-600"
   return "text-red-500"
 }
 
@@ -98,6 +117,39 @@ function exportCSV(credores: Credor[], processo: Processo) {
   a.click()
 }
 
+// ─── Indicadores agregados ────────────────────────────────────────────────────
+
+function useIndicadores(processo: Processo | null) {
+  return useMemo(() => {
+    if (!processo || processo.credores.length === 0) return null
+
+    const cessiveis = processo.credores.filter((c) => c.cessivel)
+    const comScore = cessiveis.filter((c) => c.score !== null)
+
+    const scoreMedio =
+      comScore.length > 0
+        ? comScore.reduce((s, c) => s + parseFloat(c.score!), 0) / comScore.length
+        : null
+
+    const top5 = [...cessiveis]
+      .filter((c) => c.score !== null && parseFloat(c.valor) >= 30_000)
+      .sort((a, b) => parseFloat(b.score!) - parseFloat(a.score!))
+      .slice(0, 5)
+
+    const totalCessivel = cessiveis.reduce((s, c) => s + parseFloat(c.valor), 0)
+
+    const porClasse: Record<string, number> = {}
+    for (const c of cessiveis) {
+      porClasse[c.classe] = (porClasse[c.classe] ?? 0) + parseFloat(c.valor)
+    }
+
+    const maxClasse = Math.max(...Object.values(porClasse), 1)
+    const meses = mesesDesde(processo.dataDeferimento)
+
+    return { scoreMedio, top5, totalCessivel, porClasse, maxClasse, meses, totalCessiveis: cessiveis.length }
+  }, [processo])
+}
+
 export default function ProcessoDetalhePage() {
   const params = useParams()
   const id = params["id"] as string
@@ -107,6 +159,8 @@ export default function ProcessoDetalhePage() {
   const [erro, setErro] = useState<string | null>(null)
   const [filtroClasse, setFiltroClasse] = useState("")
   const [mostrarNaoCessiveis, setMostrarNaoCessiveis] = useState(false)
+
+  const indicadores = useIndicadores(processo)
 
   useEffect(() => {
     fetch(`${API_URL}/api/processos/${id}`)
@@ -119,7 +173,7 @@ export default function ProcessoDetalhePage() {
   if (loading) return (
     <div className="min-h-screen bg-white">
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-3">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />
         ))}
       </div>
@@ -152,16 +206,17 @@ export default function ProcessoDetalhePage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+
         {/* Cabeçalho do processo */}
         <div className="border border-gray-100 rounded-lg p-6">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="text-xl font-bold text-gray-900 leading-snug">
                 {processo.recuperandaRazaoSocial ?? processo.numeroProcesso}
               </h1>
               <p className="mt-1 text-sm text-gray-500 font-mono">{processo.numeroProcesso}</p>
             </div>
-            <div className="flex gap-2 flex-wrap justify-end">
+            <div className="flex gap-2 flex-wrap justify-end shrink-0">
               {processo.subtipo && (
                 <span className="inline-flex rounded-md px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-800">
                   {SUBTIPO_LABEL[processo.subtipo] ?? processo.subtipo}
@@ -178,10 +233,10 @@ export default function ProcessoDetalhePage() {
           </div>
 
           <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><span className="text-gray-400">Estado</span><div className="font-medium">{processo.estado ?? "—"}</div></div>
-            <div><span className="text-gray-400">Comarca</span><div className="font-medium">{processo.comarca ?? "—"}</div></div>
-            <div><span className="text-gray-400">Deferimento</span><div className="font-medium">{formatData(processo.dataDeferimento)}</div></div>
-            <div><span className="text-gray-400">Distribuição</span><div className="font-medium">{formatData(processo.dataDistribuicao)}</div></div>
+            <div><span className="text-gray-400 text-xs">Estado</span><div className="font-medium mt-0.5">{processo.estado ?? "—"}</div></div>
+            <div><span className="text-gray-400 text-xs">Comarca</span><div className="font-medium mt-0.5">{processo.comarca ?? "—"}</div></div>
+            <div><span className="text-gray-400 text-xs">Deferimento</span><div className="font-medium mt-0.5">{formatData(processo.dataDeferimento)}</div></div>
+            <div><span className="text-gray-400 text-xs">Distribuição</span><div className="font-medium mt-0.5">{formatData(processo.dataDistribuicao)}</div></div>
           </div>
 
           <div className="mt-3 text-xs text-gray-400">
@@ -190,19 +245,100 @@ export default function ProcessoDetalhePage() {
               {processo.aj.urlBase}
             </a>
           </div>
-
           {processo.vara && (
-            <div className="mt-2 text-xs text-gray-500 border-l-2 border-gray-100 pl-3">
-              {processo.vara}
-            </div>
+            <div className="mt-2 text-xs text-gray-500 border-l-2 border-gray-100 pl-3">{processo.vara}</div>
           )}
         </div>
 
         {/* Alerta qualidade baixa */}
         {qualidadeBaixa && (
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <span className="text-base">⚠️</span>
+            <span className="text-base shrink-0">⚠️</span>
             <span>Lista predominantemente tributária — pouco valor para cessão privada. A maioria dos créditos é de Fazenda Pública ou INSS.</span>
+          </div>
+        )}
+
+        {/* Indicadores agregados */}
+        {indicadores && indicadores.totalCessiveis > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Score médio + idade */}
+            <div className="border border-gray-100 rounded-lg p-5">
+              <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Resumo</div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Score médio</span>
+                  <span className={`font-semibold ${scoreColor(indicadores.scoreMedio?.toFixed(2) ?? null)}`}>
+                    {indicadores.scoreMedio !== null ? indicadores.scoreMedio.toFixed(3) : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Total cessível</span>
+                  <span className="font-medium">{formatBRLCompact(indicadores.totalCessivel)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Credores cessíveis</span>
+                  <span className="font-medium">{indicadores.totalCessiveis}</span>
+                </div>
+                {indicadores.meses !== null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Idade do processo</span>
+                    <span className="font-medium">
+                      {indicadores.meses < 12
+                        ? `${Math.round(indicadores.meses)} meses`
+                        : `${(indicadores.meses / 12).toFixed(1)} anos`}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Top 5 oportunidades */}
+            <div className="border border-gray-100 rounded-lg p-5">
+              <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Top 5 oportunidades (&ge;R$30k)</div>
+              {indicadores.top5.length === 0 ? (
+                <p className="text-sm text-gray-400">Nenhum credor cessível com valor ≥ R$30k</p>
+              ) : (
+                <div className="space-y-2">
+                  {indicadores.top5.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-gray-700 line-clamp-1 flex-1">{c.nome}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-gray-400">{formatBRLCompact(parseFloat(c.valor))}</span>
+                        <span className={`text-xs font-semibold tabular-nums ${scoreColor(c.score)}`}>
+                          {c.score ? parseFloat(c.score).toFixed(2) : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Distribuição por classe */}
+            <div className="border border-gray-100 rounded-lg p-5">
+              <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Distribuição por classe (cessível)</div>
+              <div className="space-y-2">
+                {Object.entries(CLASSES).map(([k, label]) => {
+                  const val = indicadores.porClasse[k] ?? 0
+                  if (val === 0) return null
+                  const pct = (val / indicadores.maxClasse) * 100
+                  return (
+                    <div key={k}>
+                      <div className="flex justify-between text-xs mb-0.5">
+                        <span className="text-gray-500">{label}</span>
+                        <span className="text-gray-700 font-medium">{formatBRLCompact(val)}</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${CLASSE_CORES[k] ?? "bg-gray-400"}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         )}
 
@@ -230,7 +366,7 @@ export default function ProcessoDetalhePage() {
             <h2 className="text-sm font-semibold text-gray-700">
               Credores ({credoresFiltrados.length} exibidos · {cessiveis.length} cessíveis de {processo.credores.length})
             </h2>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-center">
               <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
                 <input
                   type="checkbox"
@@ -240,7 +376,6 @@ export default function ProcessoDetalhePage() {
                 />
                 Mostrar não-cessíveis
               </label>
-
               <select
                 value={filtroClasse}
                 onChange={(e) => setFiltroClasse(e.target.value)}
@@ -251,7 +386,6 @@ export default function ProcessoDetalhePage() {
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
-
               {processo.credores.length > 0 && (
                 <button
                   onClick={() => exportCSV(credoresFiltrados, processo)}
@@ -273,7 +407,7 @@ export default function ProcessoDetalhePage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {["#","Nome","Tipo","Classe","Valor","Score","Rec. Esperada","Preço-Alvo"].map((h) => (
+                    {["#","Nome","Tipo","Classe","Valor","Score v2","Rec. Esperada","Preço-Alvo"].map((h) => (
                       <th key={h} className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">
                         {h}
                       </th>
@@ -282,12 +416,14 @@ export default function ProcessoDetalhePage() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {credoresFiltrados.map((c) => (
-                    <tr key={c.id} className={`hover:bg-gray-50 ${!c.cessivel ? "opacity-50" : ""}`}>
-                      <td className="px-3 py-2.5 text-gray-400 tabular-nums">{c.posicaoLista ?? "—"}</td>
-                      <td className="px-3 py-2.5 font-medium text-gray-900 max-w-xs">
-                        <div className="line-clamp-1">{c.nome}</div>
+                    <tr key={c.id} className={`hover:bg-gray-50 ${!c.cessivel ? "opacity-40" : ""}`}>
+                      <td className="px-3 py-2.5 text-gray-400 tabular-nums text-xs">{c.posicaoLista ?? "—"}</td>
+                      <td className="px-3 py-2.5 max-w-xs">
+                        <div className="font-medium text-gray-900 line-clamp-1">{c.nome}</div>
                         {!c.cessivel && (
-                          <div className="text-xs text-amber-600">{c.scoreMotivos?.replace("Crédito não cessível: ", "")}</div>
+                          <div className="text-xs text-amber-600 line-clamp-1">
+                            {c.scoreMotivos?.replace("Crédito não cessível: ", "")}
+                          </div>
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-xs text-gray-500">{c.tipoPessoa ?? "—"}</td>
@@ -296,12 +432,12 @@ export default function ProcessoDetalhePage() {
                           {c.classe.split("_")[0]}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 tabular-nums font-medium">{formatBRL(c.valor)}</td>
-                      <td className={`px-3 py-2.5 tabular-nums ${scoreColor(c.score)}`}>
+                      <td className="px-3 py-2.5 tabular-nums font-medium text-sm">{formatBRL(c.valor)}</td>
+                      <td className={`px-3 py-2.5 tabular-nums text-sm ${scoreColor(c.score)}`}>
                         {c.cessivel && c.score ? parseFloat(c.score).toFixed(3) : "—"}
                       </td>
-                      <td className="px-3 py-2.5 tabular-nums text-gray-600">{formatBRL(c.recuperacaoEsperada)}</td>
-                      <td className="px-3 py-2.5 tabular-nums text-gray-600">{formatBRL(c.precoAlvoCompra)}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-gray-600 text-sm">{formatBRL(c.recuperacaoEsperada)}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-gray-600 text-sm">{formatBRL(c.precoAlvoCompra)}</td>
                     </tr>
                   ))}
                 </tbody>

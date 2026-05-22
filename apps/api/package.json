@@ -14,6 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "seed:admin": "tsx prisma/seed-admin.ts",
     "reprocessar:b": "tsx src/jobs/reprocessar-b.ts",
+    "score:reprocess": "tsx src/jobs/rescore-todos.ts",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "typecheck": "tsc --noEmit"
