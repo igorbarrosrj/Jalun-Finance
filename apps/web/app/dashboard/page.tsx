@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { LogoutButton } from "@/components/logout-button"
@@ -59,7 +59,7 @@ const SUBTIPO_LABEL: Record<string, { label: string; cls: string }> = {
   extrajudicial:               { label: "Extrajudicial", cls: "bg-purple-100 text-purple-800" },
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const searchParams = useSearchParams()
   const [data, setData] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -281,5 +281,13 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-gray-400 text-sm">Carregando…</div>}>
+      <DashboardContent />
+    </Suspense>
   )
 }
