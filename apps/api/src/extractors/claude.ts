@@ -141,18 +141,33 @@ ${texto}`
 
 // ─── Extração por chunk ───────────────────────────────────────────────────────
 
-const extrairChunk = async (texto: string, contexto?: string): Promise<unknown> => {
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 16000,
-    temperature: 0,
-    system: SYSTEM_PROMPT,
-    messages: [
-      { role: "user", content: buildUserPrompt(texto, contexto) },
-    ],
-  })
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-  const content = message.content[0]
+const extrairChunk = async (texto: string, contexto?: string, tentativa = 1): Promise<unknown> => {
+  let message
+  try {
+    message = await client.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 16000,
+      temperature: 0,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: buildUserPrompt(texto, contexto) }],
+    })
+  } catch (err) {
+    const msg = String(err)
+    const is429 = msg.includes("429") || msg.includes("rate_limit")
+    const is529 = msg.includes("529") || msg.includes("overloaded")
+    if ((is429 || is529) && tentativa <= 4) {
+      // Backoff: 60s, 90s, 120s, 180s
+      const espera = [60_000, 90_000, 120_000, 180_000][tentativa - 1]
+      logger.warn({ tentativa, espera: espera / 1000 }, `Rate limit — aguardando ${espera / 1000}s antes de retry`)
+      await sleep(espera)
+      return extrairChunk(texto, contexto, tentativa + 1)
+    }
+    throw err
+  }
+
+  const content = message!.content[0]
   if (content.type !== "text") throw new Error("Resposta inesperada do Claude")
 
   const raw = content.text.trim()
