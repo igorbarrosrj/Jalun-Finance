@@ -14,9 +14,9 @@ const FiltrosSchema = z.object({
   por_pagina: z.coerce.number().min(1).max(100).default(50),
 })
 
-credoresRouter.get("/", async (req, res) => {
+credoresRouter.get("/", async (req, res): Promise<void> => {
   const parsed = FiltrosSchema.safeParse(req.query)
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
 
   const { processoId, classe, valor_min, valor_max, score_min, pagina, por_pagina } = parsed.data
   const skip = (pagina - 1) * por_pagina

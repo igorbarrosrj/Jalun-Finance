@@ -8,23 +8,25 @@ const FiltrosSchema = z.object({
   estado:         z.string().optional(),
   tipo:           z.string().optional(),
   subtipo:        z.string().optional(),
+  aj_id:          z.coerce.number().optional(),
   incluir_antigos: z.coerce.boolean().default(false),
   pagina:         z.coerce.number().min(1).default(1),
   por_pagina:     z.coerce.number().min(1).max(100).default(20),
   ordem:          z.enum(["asc", "desc"]).default("desc"),
 })
 
-processosRouter.get("/", async (req, res) => {
+processosRouter.get("/", async (req, res): Promise<void> => {
   const parsed = FiltrosSchema.safeParse(req.query)
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
 
-  const { estado, tipo, subtipo, incluir_antigos, pagina, por_pagina, ordem } = parsed.data
+  const { estado, tipo, subtipo, aj_id, incluir_antigos, pagina, por_pagina, ordem } = parsed.data
   const skip = (pagina - 1) * por_pagina
 
   try {
     const where: Record<string, unknown> = {}
     if (estado) where["estado"] = estado
     if (tipo) where["tipo"] = tipo
+    if (aj_id) where["ajId"] = aj_id
     if (subtipo) {
       where["subtipo"] = subtipo
     } else if (!incluir_antigos) {
@@ -84,9 +86,9 @@ processosRouter.get("/", async (req, res) => {
   }
 })
 
-processosRouter.get("/:id", async (req, res) => {
+processosRouter.get("/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params["id"] ?? "0")
-  if (isNaN(id)) return res.status(400).json({ error: "ID inválido" })
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return }
 
   try {
     const processo = await prisma.processo.findUnique({
@@ -105,7 +107,7 @@ processosRouter.get("/:id", async (req, res) => {
       },
     })
 
-    if (!processo) return res.status(404).json({ error: "Processo não encontrado" })
+    if (!processo) { res.status(404).json({ error: "Processo não encontrado" }); return }
     res.json(processo)
   } catch (err) {
     res.status(500).json({ error: (err as Error).message })

@@ -29,8 +29,10 @@ model Processo {
   numeroProcesso          String                @unique @map("numero_processo")
   tipo                    String?
   subtipo                 String?
+  prioridade              String?
   recuperandaRazaoSocial  String?               @map("recuperanda_razao_social")
   recuperandaCnpj         String?               @map("recuperanda_cnpj")
+  nomeIncerto             Boolean               @default(false) @map("nome_incerto")
   vara                    String?
   comarca                 String?
   estado                  String?
@@ -60,6 +62,7 @@ model Documento {
   caminhoLocal    String?         @map("caminho_local")
   tamanhoBytes    Int?            @map("tamanho_bytes")
   extraido        Boolean         @default(false)
+  relevante       Boolean         @default(false)
   erroExtracao    String?         @map("erro_extracao")
   baixadoEm      DateTime        @default(now()) @map("baixado_em")
   listas          ListaCredores[]

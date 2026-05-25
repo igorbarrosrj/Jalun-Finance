@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { LogoutButton } from "@/components/logout-button"
 
 interface Processo {
@@ -29,6 +30,11 @@ interface ApiResponse {
   totalPaginas: number
 }
 
+interface AJ {
+  id: number
+  nome: string
+}
+
 const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4000"
 
 function formatBRL(v: string | null): string {
@@ -54,15 +60,25 @@ const SUBTIPO_LABEL: Record<string, { label: string; cls: string }> = {
 }
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams()
   const [data, setData] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [ajs, setAjs] = useState<AJ[]>([])
   const [filtros, setFiltros] = useState({
     estado: "",
     subtipo: "",
+    aj_id: searchParams.get("aj_id") ?? "",
     incluir_antigos: false,
     pagina: 1,
   })
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/administradores`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((d: AJ[]) => setAjs(d))
+      .catch(() => {})
+  }, [])
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -71,6 +87,7 @@ export default function DashboardPage() {
       const params = new URLSearchParams()
       if (filtros.estado) params.set("estado", filtros.estado)
       if (filtros.subtipo) params.set("subtipo", filtros.subtipo)
+      if (filtros.aj_id) params.set("aj_id", filtros.aj_id)
       if (filtros.incluir_antigos) params.set("incluir_antigos", "true")
       params.set("pagina", String(filtros.pagina))
       params.set("por_pagina", "25")
@@ -96,6 +113,9 @@ export default function DashboardPage() {
             <span className="text-sm font-medium">Dashboard</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/dashboard/administradores" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+              Admins. Judiciais
+            </Link>
             <Link href="/dashboard/favoritos" className="text-sm text-amber-500 hover:text-amber-600 transition-colors">
               ★ Favoritos
             </Link>
@@ -107,6 +127,19 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-6 py-6">
         {/* Filtros */}
         <div className="flex flex-wrap gap-3 mb-6 items-center">
+          {ajs.length > 1 && (
+            <select
+              value={filtros.aj_id}
+              onChange={(e) => setFiltros((f) => ({ ...f, aj_id: e.target.value, pagina: 1 }))}
+              className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">Todos os AJs</option>
+              {ajs.map((aj) => (
+                <option key={aj.id} value={String(aj.id)}>{aj.nome}</option>
+              ))}
+            </select>
+          )}
+
           <select
             value={filtros.estado}
             onChange={(e) => setFiltros((f) => ({ ...f, estado: e.target.value, pagina: 1 }))}
@@ -173,7 +206,7 @@ export default function DashboardPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
-                      {["Recuperanda", "Subtipo", "Estado", "Vara", "Deferimento", "Credores", "Passivo", "Docs"].map((h) => (
+                      {["Recuperanda", "AJ", "Subtipo", "Estado", "Deferimento", "Credores", "Passivo", "Docs"].map((h) => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
                           {h}
                         </th>
@@ -191,6 +224,9 @@ export default function DashboardPage() {
                             </Link>
                             <div className="text-xs text-gray-400 font-mono mt-0.5">{p.numeroProcesso}</div>
                           </td>
+                          <td className="px-4 py-3 text-xs text-gray-400 max-w-[120px]">
+                            <div className="line-clamp-2">{p.ajNome.replace("Administracao Judicial", "AJ").replace("Empresarial", "")}</div>
+                          </td>
                           <td className="px-4 py-3">
                             {sub && (
                               <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${sub.cls}`}>
@@ -199,9 +235,6 @@ export default function DashboardPage() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-gray-600">{p.estado ?? "—"}</td>
-                          <td className="px-4 py-3 text-gray-500 max-w-xs">
-                            <div className="line-clamp-2 text-xs">{p.vara ?? "—"}</div>
-                          </td>
                           <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatData(p.dataDeferimento)}</td>
                           <td className="px-4 py-3 text-center">
                             {p.totalCredores > 0

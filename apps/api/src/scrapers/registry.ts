@@ -1,8 +1,10 @@
 import type { ScraperAJ } from "./tipos"
 import { AjRuizScraper } from "./aj-ruiz"
+import { R4CScraper } from "./r4c"
 
 const scrapers: ScraperAJ[] = [
   new AjRuizScraper(),
+  new R4CScraper(),
 ]
 
 export function getScraperByUrlBase(urlBase: string): ScraperAJ | undefined {

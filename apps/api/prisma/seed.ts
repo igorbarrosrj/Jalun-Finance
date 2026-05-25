@@ -11,11 +11,11 @@ const AJS = [
     ativo: true,
   },
   {
-    nome: 'R4C Administracao Judicial',
-    urlBase: 'https://www.r4c.com.br',
-    urlIndice: null as string | null,
+    nome: 'R4C Empresarial',
+    urlBase: 'https://r4cempresarial.com.br',
+    urlIndice: 'https://r4cempresarial.com.br/?tipo-de-processo=recuperacoes-judiciais',
     estado: 'SP',
-    ativo: false,
+    ativo: true,
   },
   {
     nome: 'Diligence Administracao Judicial',

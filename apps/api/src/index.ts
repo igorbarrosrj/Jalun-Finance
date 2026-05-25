@@ -5,6 +5,7 @@ import { logger } from "./lib/logger"
 import { processosRouter } from "./routes/processos"
 import { credoresRouter } from "./routes/credores"
 import { statsRouter } from "./routes/stats"
+import { administradoresRouter } from "./routes/administradores"
 
 const app = express()
 
@@ -35,6 +36,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/processos", processosRouter)
 app.use("/api/credores", credoresRouter)
 app.use("/api/stats", statsRouter)
+app.use("/api/administradores", administradoresRouter)
 
 // TODO Fase auth: adicionar middleware de autenticação
 // app.use(authMiddleware)
