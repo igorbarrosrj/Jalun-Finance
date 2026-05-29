@@ -38,9 +38,10 @@ function calcularScoreV2(
   tipoPessoa: TipoPessoa,
   cessivel: boolean,
   dataDeferimento: Date | null
-): { score: number; recuperacaoEsperada: number; precoAlvoCompra: number; motivos: string } {
+): { score: number; recuperacaoEsperada: number; precoAlvoCompra: number; motivos: string | null } {
   if (!cessivel) {
-    return { score: 0, recuperacaoEsperada: 0, precoAlvoCompra: 0, motivos: "Crédito não cessível" }
+    // null → não sobrescreve o motivo já gravado pelo filtro ehCredorNaoCessivel
+    return { score: 0, recuperacaoEsperada: 0, precoAlvoCompra: 0, motivos: null }
   }
 
   const classeKey = (classe in BASE_CLASSE ? classe : "III_quirografario") as ClasseCredor
@@ -109,7 +110,8 @@ export const scorarProcessoV2 = async (processoId: number): Promise<number> => {
       where: { id: c.id },
       data: {
         score: new Decimal(result.score),
-        scoreMotivos: result.motivos,
+        // Para não-cessíveis: motivos=null preserva o motivo do filtro já gravado
+        ...(result.motivos !== null ? { scoreMotivos: result.motivos } : {}),
         recuperacaoEsperada: new Decimal(result.recuperacaoEsperada),
         precoAlvoCompra: new Decimal(result.precoAlvoCompra),
       },

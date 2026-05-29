@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { auth } from "@/auth"
 
 // ─── Dados em tempo real via SSR ─────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ function IconGrafico() {
 // ─── Landing ─────────────────────────────────────────────────────────────────
 
 export default async function HomePage() {
-  const stats = await getStats()
+  const [stats, session] = await Promise.all([getStats(), auth()])
 
   return (
     <main className="bg-white text-[#0a0a0a]">
@@ -74,12 +75,25 @@ export default async function HomePage() {
       {/* ── Nav ── */}
       <nav className="max-w-[1280px] mx-auto px-6 md:px-10 h-16 flex items-center justify-between">
         <span className="text-sm font-semibold tracking-tight">Credor Radar</span>
-        <Link
-          href="/login"
-          className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150"
-        >
-          Acessar →
-        </Link>
+        <div className="flex items-center gap-4">
+          {session ? (
+            <Link href="/dashboard" className="text-sm rounded-md bg-[#0a0a0a] px-4 py-2 font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150">
+              Ir para o Dashboard →
+            </Link>
+          ) : (
+            <>
+              <a href="#planos" className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150 hidden md:inline">
+                Planos
+              </a>
+              <Link href="/login" className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150">
+                Entrar
+              </Link>
+              <Link href="/cadastro" className="text-sm rounded-md bg-[#0a0a0a] px-4 py-2 font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150">
+                Trial grátis →
+              </Link>
+            </>
+          )}
+        </div>
       </nav>
 
       {/* ── Hero ── */}
@@ -100,18 +114,29 @@ export default async function HomePage() {
         </p>
 
         <div className="mt-10 flex flex-wrap items-center gap-4">
-          <Link
-            href="/login"
-            className="inline-flex items-center rounded-md bg-[#0a0a0a] px-6 py-3 text-sm font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150"
-          >
-            Acessar plataforma →
-          </Link>
-          <Link
-            href="#como-funciona"
-            className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150"
-          >
-            Ver demonstração
-          </Link>
+          {session ? (
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center rounded-md bg-[#0a0a0a] px-6 py-3 text-sm font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150"
+            >
+              Ir para o Dashboard →
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/cadastro"
+                className="inline-flex items-center rounded-md bg-[#0a0a0a] px-6 py-3 text-sm font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150"
+              >
+                Começar trial gratuito →
+              </Link>
+              <Link
+                href="/login"
+                className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150"
+              >
+                Já tenho conta
+              </Link>
+            </>
+          )}
         </div>
 
         <p className="mt-6 text-xs text-[#a3a3a3]">
@@ -226,6 +251,132 @@ export default async function HomePage() {
         </p>
       </section>
 
+      {/* ── Planos ── */}
+      <section id="planos" className="bg-[#fafafa] border-y border-[#e5e5e5]">
+        <div className="max-w-[1280px] mx-auto px-6 md:px-10 py-28 md:py-36">
+          <p className="font-mono text-xs text-[#064e3b] uppercase tracking-[0.15em] mb-4">Planos</p>
+          <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.03em] mb-4">
+            Escolha o plano certo para sua operação.
+          </h2>
+          <p className="text-[#525252] text-base mb-16 max-w-xl">
+            Todos os planos incluem trial gratuito de 14 dias. Sem cartão de crédito para começar.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            {/* Starter */}
+            <div className="bg-white border border-[#e5e5e5] rounded-xl p-8 flex flex-col">
+              <div className="mb-6">
+                <p className="text-xs font-mono uppercase tracking-widest text-[#a3a3a3] mb-3">Starter</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-semibold text-[#0a0a0a] tracking-tight">R$ 1.997</span>
+                  <span className="text-sm text-[#a3a3a3]">/mês</span>
+                </div>
+                <p className="text-xs text-[#a3a3a3] mt-1.5">15 análises por mês</p>
+              </div>
+              <ul className="space-y-3 flex-1 mb-8">
+                {[
+                  "Acesso a todos os processos monitorados",
+                  "Ranqueamento de credores por score",
+                  "Export CSV",
+                  "Até 3 visões salvas",
+                  "Suporte por e-mail",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-[#525252]">
+                    <span className="text-[#064e3b] font-medium mt-0.5 shrink-0">✓</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/cadastro"
+                className="block text-center rounded-md border border-[#0a0a0a] text-[#0a0a0a] text-sm font-medium px-5 py-2.5 hover:bg-[#0a0a0a] hover:text-white transition-colors duration-150"
+              >
+                Começar trial →
+              </Link>
+            </div>
+
+            {/* Pro — destaque */}
+            <div className="bg-[#0a0a0a] rounded-xl p-8 flex flex-col relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="bg-[#064e3b] text-white text-[10px] font-mono uppercase tracking-widest px-3 py-1 rounded-full">
+                  Mais popular
+                </span>
+              </div>
+              <div className="mb-6">
+                <p className="text-xs font-mono uppercase tracking-widest text-[#525252] mb-3">Pro</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-semibold text-white tracking-tight">R$ 6.997</span>
+                  <span className="text-sm text-[#525252]">/mês</span>
+                </div>
+                <p className="text-xs text-[#525252] mt-1.5">100 análises por mês</p>
+              </div>
+              <ul className="space-y-3 flex-1 mb-8">
+                {[
+                  "Tudo do Starter",
+                  "Análise detalhada por credor com IA",
+                  "Alertas automáticos por e-mail",
+                  "Até 20 visões salvas",
+                  "Export XLSX",
+                  "Acesso à API (10.000 req/mês)",
+                  "Suporte prioritário",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-[#a3a3a3]">
+                    <span className="text-[#6ee7b7] font-medium mt-0.5 shrink-0">✓</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/cadastro"
+                className="block text-center rounded-md bg-white text-[#0a0a0a] text-sm font-medium px-5 py-2.5 hover:bg-[#f5f5f5] transition-colors duration-150"
+              >
+                Começar trial →
+              </Link>
+            </div>
+
+            {/* Enterprise */}
+            <div className="bg-white border border-[#e5e5e5] rounded-xl p-8 flex flex-col">
+              <div className="mb-6">
+                <p className="text-xs font-mono uppercase tracking-widest text-[#a3a3a3] mb-3">Enterprise</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-semibold text-[#0a0a0a] tracking-tight">R$ 19.997</span>
+                  <span className="text-sm text-[#a3a3a3]">/mês</span>
+                </div>
+                <p className="text-xs text-[#a3a3a3] mt-1.5">500 análises por mês</p>
+              </div>
+              <ul className="space-y-3 flex-1 mb-8">
+                {[
+                  "Tudo do Pro",
+                  "Visões ilimitadas",
+                  "API sem limite de requisições",
+                  "Webhooks em tempo real",
+                  "SLA garantido",
+                  "Gerente de conta dedicado",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-[#525252]">
+                    <span className="text-[#064e3b] font-medium mt-0.5 shrink-0">✓</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/cadastro"
+                className="block text-center rounded-md border border-[#0a0a0a] text-[#0a0a0a] text-sm font-medium px-5 py-2.5 hover:bg-[#0a0a0a] hover:text-white transition-colors duration-150"
+              >
+                Falar com o time →
+              </Link>
+            </div>
+
+          </div>
+
+          <p className="text-center text-xs text-[#a3a3a3] mt-10">
+            Precisa de volume maior ou integração customizada?{" "}
+            <span className="underline cursor-pointer hover:text-[#525252] transition-colors">Fale conosco</span>.
+          </p>
+        </div>
+      </section>
+
       {/* ── CTA final ── */}
       <section className="bg-[#0a0a0a]">
         <div className="max-w-[1280px] mx-auto px-6 md:px-10 py-24 md:py-32 text-center">
@@ -236,10 +387,10 @@ export default async function HomePage() {
             Trial gratuito de 14 dias. Sem cartão de crédito.
           </p>
           <Link
-            href="/login"
+            href="/cadastro"
             className="inline-flex items-center rounded-md bg-white px-7 py-3.5 text-sm font-medium text-[#0a0a0a] hover:bg-[#f5f5f5] transition-colors duration-150"
           >
-            Solicitar acesso
+            Começar trial gratuito →
           </Link>
         </div>
       </section>

@@ -43,9 +43,15 @@ model Processo {
   rawHtml                 String?               @map("raw_html") @db.Text
   descobertoEm            DateTime              @default(now()) @map("descoberto_em")
   atualizadoEm            DateTime?             @updatedAt @map("atualizado_em")
+  analiseProcessoIA       String?               @map("analise_processo_ia") @db.Text
+  tesesOperacao           Json?                 @map("teses_operacao")
+  analiseProcessoGeradaEm DateTime?             @map("analise_processo_gerada_em")
   documentos              Documento[]
   listas                  ListaCredores[]
   credores                Credor[]
+  solicitacoes            SolicitacaoExtracao[]
+  historicoPassivo        HistoricoPassivo[]
+  custosIA                CustoIA[]
 
   @@map("processos")
 }
@@ -108,7 +114,13 @@ model Credor {
   precoAlvoCompra      Decimal?         @map("preco_alvo_compra") @db.Decimal(15, 2)
   score                Decimal?         @db.Decimal(8, 4)
   scoreMotivos         String?          @map("score_motivos") @db.Text
+  analiseDetalhada     String?          @map("analise_detalhada") @db.Text
+  analisadoEm          DateTime?        @map("analisado_em")
+  analiseTokensInput   Int?             @map("analise_tokens_input")
+  analiseTokensOutput  Int?             @map("analise_tokens_output")
+  analiseModelo        String?          @map("analise_modelo")
   favoritos            CredorFavorito[]
+  custosIA             CustoIA[]
 
   @@index([score(sort: Desc)])
   @@index([classe])
@@ -118,18 +130,95 @@ model Credor {
 }
 
 model Usuario {
-  id          Int              @id @default(autoincrement())
-  email       String           @unique
-  nome        String
-  senhaHash   String           @map("senha_hash")
-  papel       String           @default("viewer")
-  ativo       Boolean          @default(true)
-  criadoEm   DateTime         @default(now()) @map("criado_em")
-  ultimoLogin DateTime?        @map("ultimo_login")
-  favoritos   CredorFavorito[]
-  alertas     AlertaConfig[]
+  id           Int                  @id @default(autoincrement())
+  email        String               @unique
+  nome         String
+  senhaHash    String               @map("senha_hash")
+  papel        String               @default("viewer")
+  ativo        Boolean              @default(true)
+  criadoEm    DateTime             @default(now()) @map("criado_em")
+  ultimoLogin DateTime?            @map("ultimo_login")
+  favoritos    CredorFavorito[]
+  alertas      AlertaConfig[]
+  visoes       VisaoSalva[]
+  assinatura   AssinaturaUsuario?
+  credito      CreditoUsuario?
+  transacoes   TransacaoCredito[]
+  solicitacoes SolicitacaoExtracao[]
+  custosIA     CustoIA[]
 
   @@map("usuarios")
+}
+
+model Plano {
+  id           Int                 @id @default(autoincrement())
+  slug         String              @unique
+  nome         String
+  preco        Decimal             @db.Decimal(10, 2)
+  creditosMes  Int                 @map("creditos_mes")
+  recursos     Json
+  ativo        Boolean             @default(true)
+  ordem        Int                 @default(0)
+  assinaturas  AssinaturaUsuario[]
+
+  @@map("planos")
+}
+
+model AssinaturaUsuario {
+  id               Int       @id @default(autoincrement())
+  usuario          Usuario   @relation(fields: [usuarioId], references: [id])
+  usuarioId        Int       @unique @map("usuario_id")
+  plano            Plano     @relation(fields: [planoId], references: [id])
+  planoId          Int       @map("plano_id")
+  status           String    @default("trial") // 'trial', 'ativa', 'inadimplente', 'cancelada'
+  inicio           DateTime  @default(now())
+  proximaRenovacao DateTime  @map("proxima_renovacao")
+  cancelamentoEm  DateTime? @map("cancelamento_em")
+
+  @@map("assinaturas_usuarios")
+}
+
+model CreditoUsuario {
+  id            Int       @id @default(autoincrement())
+  usuario       Usuario   @relation(fields: [usuarioId], references: [id])
+  usuarioId     Int       @unique @map("usuario_id")
+  saldo         Int       @default(0)
+  ultimaRecarga DateTime? @map("ultima_recarga")
+
+  @@map("creditos_usuarios")
+}
+
+model TransacaoCredito {
+  id          Int      @id @default(autoincrement())
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioId   Int      @map("usuario_id")
+  tipo        String   // 'renovacao_mensal', 'compra_avulsa', 'consumo_extracao', 'devolucao_erro', 'bonus'
+  quantidade  Int
+  descricao   String?
+  processoId  Int?     @map("processo_id")
+  metadata    Json?
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  @@index([usuarioId, criadoEm(sort: Desc)])
+  @@map("transacoes_creditos")
+}
+
+model SolicitacaoExtracao {
+  id                  Int       @id @default(autoincrement())
+  usuario             Usuario   @relation(fields: [usuarioId], references: [id])
+  usuarioId           Int       @map("usuario_id")
+  processo            Processo  @relation(fields: [processoId], references: [id])
+  processoId          Int       @map("processo_id")
+  status              String    @default("aguardando") // 'aguardando', 'processando', 'concluida', 'erro'
+  creditosConsumidos  Int       @default(1) @map("creditos_consumidos")
+  iniciadoEm         DateTime? @map("iniciado_em")
+  concluidoEm        DateTime? @map("concluido_em")
+  erroMensagem       String?   @map("erro_mensagem") @db.Text
+  criadoEm           DateTime  @default(now()) @map("criado_em")
+
+  @@index([usuarioId, criadoEm(sort: Desc)])
+  @@index([status])
+  @@map("solicitacoes_extracao")
 }
 
 model CredorFavorito {
@@ -143,6 +232,64 @@ model CredorFavorito {
 
   @@unique([usuarioId, credorId])
   @@map("credores_favoritos")
+}
+
+model AtividadeSistema {
+  id         Int      @id @default(autoincrement())
+  tipo       String   // 'processo_novo', 'credor_novo', 'plano_atualizado', 'lista_atualizada'
+  processoId Int?     @map("processo_id")
+  credorId   Int?     @map("credor_id")
+  metadata   Json?
+  criadoEm   DateTime @default(now()) @map("criado_em")
+
+  @@index([criadoEm(sort: Desc)])
+  @@index([tipo])
+  @@map("atividades_sistema")
+}
+
+model VisaoSalva {
+  id        Int      @id @default(autoincrement())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioId Int      @map("usuario_id")
+  nome      String
+  filtros   Json     // { estado, subtipo, aj_id, incluir_antigos }
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([usuarioId])
+  @@map("visoes_salvas")
+}
+
+model HistoricoPassivo {
+  id          Int      @id @default(autoincrement())
+  processo    Processo @relation(fields: [processoId], references: [id])
+  processoId  Int      @map("processo_id")
+  valorTotal  Decimal  @map("valor_total") @db.Decimal(18, 2)
+  qtdCredores Int      @map("qtd_credores")
+  criadoEm   DateTime @default(now()) @map("criado_em")
+
+  @@index([processoId, criadoEm(sort: Desc)])
+  @@map("historico_passivo")
+}
+
+model CustoIA {
+  id            Int       @id @default(autoincrement())
+  tipo          String    // 'analise_credor', 'analise_processo', 'extracao_lista'
+  modelo        String
+  tokensInput   Int       @map("tokens_input")
+  tokensOutput  Int       @map("tokens_output")
+  custoUsd      Decimal   @db.Decimal(10, 6) @map("custo_usd")
+  custoBrl      Decimal   @db.Decimal(10, 4) @map("custo_brl")
+  processoId    Int?      @map("processo_id")
+  processo      Processo? @relation(fields: [processoId], references: [id])
+  credorId      Int?      @map("credor_id")
+  credor        Credor?   @relation(fields: [credorId], references: [id])
+  usuarioId     Int?      @map("usuario_id")
+  usuario       Usuario?  @relation(fields: [usuarioId], references: [id])
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+
+  @@index([criadoEm(sort: Desc)])
+  @@index([tipo])
+  @@map("custos_ia")
 }
 
 model AlertaConfig {

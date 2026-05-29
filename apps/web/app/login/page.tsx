@@ -1,19 +1,27 @@
 "use client"
 
 import { useState, FormEvent } from "react"
-import { signIn } from "next-auth/react"
+import { signIn, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Suspense } from "react"
+import { Suspense, useEffect } from "react"
 
 function LoginForm() {
   const router = useRouter()
   const params = useSearchParams()
   const callbackUrl = params.get("callbackUrl") ?? "/dashboard"
+  const { status } = useSession()
 
   const [email, setEmail] = useState("")
   const [senha, setSenha] = useState("")
   const [erro, setErro] = useState("")
   const [loading, setLoading] = useState(false)
+
+  // Já está logado → vai direto pro dashboard
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace(callbackUrl)
+    }
+  }, [status, router, callbackUrl])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -35,6 +43,15 @@ function LoginForm() {
 
     router.push(callbackUrl)
     router.refresh()
+  }
+
+  // Enquanto verifica ou redireciona, mostra loading
+  if (status === "loading" || status === "authenticated") {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (

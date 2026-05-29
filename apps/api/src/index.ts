@@ -6,6 +6,15 @@ import { processosRouter } from "./routes/processos"
 import { credoresRouter } from "./routes/credores"
 import { statsRouter } from "./routes/stats"
 import { administradoresRouter } from "./routes/administradores"
+import { atividadesRouter } from "./routes/atividades"
+import { cadastroRouter } from "./routes/cadastro"
+import { meRouter } from "./routes/me"
+import { extracaoRouter } from "./routes/extracao"
+import { creditosRouter } from "./routes/creditos"
+import { vioesRouter } from "./routes/visoes"
+import { alertasRouter } from "./routes/alertas"
+import { adminRouter } from "./routes/admin"
+import "./jobs/worker"
 
 const app = express()
 
@@ -37,6 +46,14 @@ app.use("/api/processos", processosRouter)
 app.use("/api/credores", credoresRouter)
 app.use("/api/stats", statsRouter)
 app.use("/api/administradores", administradoresRouter)
+app.use("/api/atividades", atividadesRouter)
+app.use("/api/cadastro", cadastroRouter)
+app.use("/api/me", meRouter)
+app.use("/api/extracao", extracaoRouter)
+app.use("/api/creditos", creditosRouter)
+app.use("/api/visoes", vioesRouter)
+app.use("/api/alertas", alertasRouter)
+app.use("/api/admin", adminRouter)
 
 // TODO Fase auth: adicionar middleware de autenticação
 // app.use(authMiddleware)

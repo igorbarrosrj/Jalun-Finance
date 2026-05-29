@@ -17,7 +17,7 @@ const SINDICATOS = [
   "CENTRAL ÚNICA", "CUT ", "CGT ", "CONFEDERAÇÃO", "CONFEDERACAO",
 ]
 
-const VALOR_MINIMO_OPERAVEL = 5_000
+const VALOR_MINIMO_OPERAVEL = 2_000
 
 function nomeContem(nome: string, lista: string[]): string | null {
   const n = nome.toUpperCase()
@@ -29,6 +29,14 @@ export type FiltroResult =
   | { cessivel: false; motivo: string }
 
 export function ehCredorNaoCessivel(nome: string, valor: number): FiltroResult {
+  // Totalizadores de classe extraídos de planos de RJ (não são credores individuais)
+  if (/^classe\s+(i{1,3}|iv|v)\b/i.test(nome.trim())) {
+    return { cessivel: false, motivo: "Totalizador de classe (não é credor individual)" }
+  }
+  if (/\b(consolidado|subtotal|total geral|total da classe|total por classe)\b/i.test(nome)) {
+    return { cessivel: false, motivo: "Totalizador consolidado" }
+  }
+
   const m1 = nomeContem(nome, FAZENDA_PUBLICA)
   if (m1) return { cessivel: false, motivo: `Fazenda Pública (${m1.trim()})` }
 
@@ -42,7 +50,7 @@ export function ehCredorNaoCessivel(nome: string, valor: number): FiltroResult {
   if (m4) return { cessivel: false, motivo: `Sindicato/entidade sindical (${m4.trim()})` }
 
   if (valor < VALOR_MINIMO_OPERAVEL) {
-    return { cessivel: false, motivo: `Valor abaixo do mínimo operável (R$ ${valor.toFixed(2)})` }
+    return { cessivel: false, motivo: `Valor abaixo do mínimo operacional (R$ ${valor.toFixed(2)} < R$ 2.000)` }
   }
 
   return { cessivel: true }

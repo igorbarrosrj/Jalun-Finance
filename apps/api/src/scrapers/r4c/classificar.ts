@@ -39,7 +39,8 @@ const REGRAS: Array<{ regex: RegExp; tipo: string }> = [
 ]
 
 export function classificarDocumento(nomeArquivo: string, descricao: string): ClassificacaoDoc {
-  const texto = `${descricao} ${nomeArquivo}`.toLowerCase()
+  const nomeDec = (() => { try { return decodeURIComponent(nomeArquivo) } catch { return nomeArquivo } })()
+  const texto = `${descricao} ${nomeDec}`.toLowerCase()
 
   for (const { regex, tipo } of REGRAS) {
     if (regex.test(texto)) {

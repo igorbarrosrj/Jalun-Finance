@@ -1,8 +1,15 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { LogoutButton } from "@/components/logout-button"
+
+const AJ_LOGOS: Record<string, string> = {
+  "https://www.ajruiz.com.br":        "/logos/aj-ruiz.svg",
+  "https://r4cempresarial.com.br":    "/logos/r4c.png",
+  "https://www.onbehalfbrasil.com.br": "/logos/onbehalf.png",
+}
 
 interface AJ {
   id: number
@@ -77,16 +84,34 @@ export default function AdministradoresPage() {
               return (
                 <div key={aj.id} className="border border-gray-100 rounded-lg p-5 hover:border-gray-200 transition-colors">
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="font-semibold text-gray-900">{aj.nome}</h2>
-                      <a
-                        href={aj.urlBase}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-gray-400 hover:text-blue-500 transition-colors"
-                      >
-                        {aj.urlBase}
-                      </a>
+                    <div className="flex items-center gap-3 min-w-0">
+                      {AJ_LOGOS[aj.urlBase] ? (
+                        <div className="shrink-0 w-16 h-10 flex items-center justify-center bg-gray-50 rounded-md border border-gray-100 p-1.5">
+                          <Image
+                            src={AJ_LOGOS[aj.urlBase]!}
+                            alt={aj.nome}
+                            width={56}
+                            height={32}
+                            className="object-contain max-h-full"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="shrink-0 w-16 h-10 flex items-center justify-center bg-gray-100 rounded-md text-gray-400 text-xs font-bold">
+                          AJ
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <h2 className="font-semibold text-gray-900 leading-snug">{aj.nome}</h2>
+                        <a
+                          href={aj.urlBase}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-gray-400 hover:text-blue-500 transition-colors"
+                        >
+                          {aj.urlBase}
+                        </a>
+                      </div>
                     </div>
                     <Link
                       href={`/dashboard?aj_id=${aj.id}`}

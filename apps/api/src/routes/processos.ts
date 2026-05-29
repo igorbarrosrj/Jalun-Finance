@@ -1,6 +1,8 @@
 import { Router } from "express"
 import { z } from "zod"
 import { prisma } from "../lib/db"
+import { rescrapeQueue } from "../jobs/queue"
+import { gerarAnaliseProcesso } from "../extractors/analise-processo"
 
 export const processosRouter = Router()
 
@@ -113,3 +115,82 @@ processosRouter.get("/:id", async (req, res): Promise<void> => {
     res.status(500).json({ error: (err as Error).message })
   }
 })
+
+// ─── GET /api/processos/:id/historico ────────────────────────────────────────
+
+processosRouter.get("/:id/historico", async (req, res): Promise<void> => {
+  const id = parseInt(req.params["id"] ?? "0")
+  if (isNaN(id)) { res.status(400).json({ erro: "ID inválido" }); return }
+
+  const historico = await prisma.historicoPassivo.findMany({
+    where: { processoId: id },
+    orderBy: { criadoEm: "asc" },
+    take: 30,
+    select: { id: true, valorTotal: true, qtdCredores: true, criadoEm: true },
+  })
+
+  res.json(historico.map((h) => ({
+    ...h,
+    valorTotal: h.valorTotal.toString(),
+  })))
+})
+
+// ─── POST /api/processos/:id/re-scrape ───────────────────────────────────────
+
+processosRouter.post("/:id/re-scrape", async (req, res): Promise<void> => {
+  const id = parseInt(req.params["id"] ?? "0")
+  if (isNaN(id)) { res.status(400).json({ erro: "ID inválido" }); return }
+
+  const processo = await prisma.processo.findUnique({
+    where: { id },
+    select: { id: true, numeroProcesso: true, recuperandaRazaoSocial: true },
+  })
+  if (!processo) { res.status(404).json({ erro: "Processo não encontrado" }); return }
+
+  // Evita enfileirar duplicado se já há um job pendente
+  const waiting = await rescrapeQueue.getWaiting()
+  const jaEnfileirado = waiting.some((j) => j.data?.processoId === id)
+  if (jaEnfileirado) {
+    res.json({ status: "ja_enfileirado", message: "Já existe uma busca em andamento para este processo." })
+    return
+  }
+
+  const job = await rescrapeQueue.add("rescrape-processo", { processoId: id })
+
+  res.status(202).json({
+    status: "enfileirado",
+    jobId: job.id,
+    tempoEstimado: "1-2 minutos",
+    message: "Buscando novos documentos no site do AJ. A página atualizará automaticamente.",
+  })
+})
+
+// ─── POST /api/processos/:id/analisar ─────────────────────────────────────────
+// Gera (ou retorna cache) análise de portfólio do processo.
+// Cache de 3 dias — passa ?forcar=true para regenerar.
+
+processosRouter.post("/:id/analisar", async (req, res): Promise<void> => {
+  const id = parseInt(req.params["id"] ?? "")
+  if (isNaN(id)) { res.status(400).json({ erro: "ID inválido" }); return }
+
+  const forcar = req.query["forcar"] === "true"
+  const usuarioId = req.body?.usuarioId ?? undefined
+
+  try {
+    const resultado = await gerarAnaliseProcesso(id, { forcar, usuarioId })
+    res.json({
+      analise: resultado.analise,
+      teses: resultado.teses,
+      cache: resultado.cached,
+      geradaEm: resultado.geradaEm,
+    })
+  } catch (err) {
+    const errMsg = (err as Error).message ?? "Erro desconhecido"
+    if (errMsg === "Processo não encontrado") { res.status(404).json({ erro: errMsg }); return }
+    import("../lib/logger").then(({ logger }) =>
+      logger.error({ processoId: id, err: errMsg }, "Erro ao gerar análise de processo")
+    )
+    res.status(503).json({ erro: "Serviço de análise temporariamente indisponível. Tente novamente." })
+  }
+})
+

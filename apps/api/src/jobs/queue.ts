@@ -20,6 +20,23 @@ const queueOpts: QueueOptions = {
   },
 }
 
-export const scrapeQueue  = new Queue("scrape",  queueOpts)
-export const extractQueue = new Queue("extract", queueOpts)
-export const scoreQueue   = new Queue("score",   queueOpts)
+export const scrapeQueue              = new Queue("scrape",              queueOpts)
+export const extractQueue             = new Queue("extract",             queueOpts)
+export const scoreQueue               = new Queue("score",               queueOpts)
+export const extracaoPrioritariaQueue = new Queue("extract-prioritaria", {
+  ...queueOpts,
+  defaultJobOptions: {
+    ...queueOpts.defaultJobOptions,
+    attempts: 2,
+    backoff: { type: "fixed", delay: 10_000 },
+  },
+})
+
+export const rescrapeQueue = new Queue("rescrape-processo", {
+  ...queueOpts,
+  defaultJobOptions: {
+    ...queueOpts.defaultJobOptions,
+    attempts: 2,
+    backoff: { type: "fixed", delay: 30_000 },
+  },
+})

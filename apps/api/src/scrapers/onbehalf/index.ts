@@ -5,7 +5,7 @@ import { logger } from "../../lib/logger"
 import { calcularSubtipo } from "../../lib/classificarCredor"
 import { registrarAtividade } from "../../lib/atividades"
 
-const BASE_URL = "https://r4cempresarial.com.br"
+export const ONBEHALF_URL = "https://www.onbehalfbrasil.com.br"
 
 function calcularPrioridade(tipo: "RJ" | "falencia", dataDeferimento: Date | null): string {
   if (tipo === "falencia") return "baixa"
@@ -14,31 +14,23 @@ function calcularPrioridade(tipo: "RJ" | "falencia", dataDeferimento: Date | nul
   return meses <= 36 ? "alta" : "media"
 }
 
-export class R4CScraper implements ScraperAJ {
-  readonly urlBase = BASE_URL
+export class OnBehalfScraper implements ScraperAJ {
+  readonly urlBase = ONBEHALF_URL
 
-  async run(opts: { limit?: number } = {}): Promise<ScraperResult> {
-    const batchSize = opts.limit ?? parseInt(process.env["R4C_BATCH_SIZE"] ?? "10")
-
-    const aj = await prisma.administradorJudicial.findFirst({ where: { urlBase: BASE_URL } })
-    if (!aj) throw new Error("R4C não encontrado no banco — rode: npm run db:seed")
+  async run(): Promise<ScraperResult> {
+    const aj = await prisma.administradorJudicial.findFirst({ where: { urlBase: ONBEHALF_URL } })
+    if (!aj) throw new Error("OnBehalf não encontrado no banco — rode o seed ou insira manualmente")
 
     const todos = await listarTodosProcessos()
-    logger.info({ total: todos.length }, "R4C: processos descobertos no site")
+    logger.info({ total: todos.length }, "OnBehalf: processos descobertos no site")
 
     let novos = 0, atualizados = 0, erros = 0, pdfsNovos = 0
 
     for (const proc of todos) {
       if (!proc.numeroProcesso) {
-        logger.warn({ nome: proc.recuperandaRazaoSocial }, "R4C: sem CNJ — pulando")
+        logger.warn({ nome: proc.recuperandaRazaoSocial }, "OnBehalf: sem CNJ — pulando")
         erros++
         continue
-      }
-
-      // Limit: só processar se houver quota de novos disponível
-      if (novos >= batchSize) {
-        logger.info({ batchSize }, "R4C: limite de batch atingido — parando")
-        break
       }
 
       try {
@@ -47,70 +39,54 @@ export class R4CScraper implements ScraperAJ {
           select: { id: true },
         })
 
-        const subtipo = calcularSubtipo(
-          proc.tipo === "falencia" ? "falencia" : "RJ",
-          proc.dataDeferimento
-        )
-        const prioridade = calcularPrioridade(proc.tipo, proc.dataDeferimento)
+        const subtipo = calcularSubtipo(proc.tipo, null /* sem dataDeferimento da lista */)
+        const prioridade = calcularPrioridade(proc.tipo, null)
 
         if (existing) {
-          // Atualizar campos mutáveis
           await prisma.processo.update({
             where: { id: existing.id },
             data: {
               recuperandaRazaoSocial: proc.recuperandaRazaoSocial,
-              vara: proc.vara,
-              comarca: proc.comarca,
-              dataDeferimento: proc.dataDeferimento ?? undefined,
-              dataDistribuicao: proc.dataDistribuicao ?? undefined,
               subtipo,
               prioridade,
+              urlPaginaAj: proc.urlPaginaAj,
               status: "scrapeado",
             },
           })
           atualizados++
-
-          // Catalogar PDFs novos (existente → não rebaixar)
-          const pdfNovosCount = await this.catalogarPdfs(existing.id, proc.pdfs)
-          pdfsNovos += pdfNovosCount
+          pdfsNovos += await this.catalogarPdfs(existing.id, proc.pdfs)
           continue
         }
 
-        // Processo NOVO — conta para o batch
+        // Novo processo
         const criado = await prisma.processo.create({
           data: {
             ajId: aj.id,
             numeroProcesso: proc.numeroProcesso,
-            tipo: proc.tipo === "falencia" ? "falencia" : "RJ",
+            tipo: proc.tipo,
             subtipo,
             prioridade,
             recuperandaRazaoSocial: proc.recuperandaRazaoSocial,
-            nomeIncerto: proc.nomeIncerto,
-            vara: proc.vara,
-            comarca: proc.comarca,
+            nomeIncerto: false,
             estado: proc.estado,
-            dataDistribuicao: proc.dataDistribuicao,
-            dataDeferimento: proc.dataDeferimento,
             urlPaginaAj: proc.urlPaginaAj,
             status: "scrapeado",
           },
         })
 
         logger.info(
-          { id: criado.id, cnj: proc.numeroProcesso, nome: proc.recuperandaRazaoSocial?.substring(0, 50), prioridade },
-          "R4C: processo novo"
+          { id: criado.id, cnj: proc.numeroProcesso, nome: proc.recuperandaRazaoSocial?.substring(0, 50) },
+          "OnBehalf: processo novo"
         )
         await registrarAtividade("processo_novo", {
           processoId: criado.id,
           metadata: { nome: proc.recuperandaRazaoSocial, estado: proc.estado, subtipo },
         })
         novos++
-
-        const pdfNovosCount = await this.catalogarPdfs(criado.id, proc.pdfs)
-        pdfsNovos += pdfNovosCount
+        pdfsNovos += await this.catalogarPdfs(criado.id, proc.pdfs)
 
       } catch (err) {
-        logger.error({ err: (err as Error).message, cnj: proc.numeroProcesso }, "R4C: erro ao salvar processo")
+        logger.error({ err: (err as Error).message, cnj: proc.numeroProcesso }, "OnBehalf: erro ao salvar")
         erros++
       }
     }
@@ -120,7 +96,7 @@ export class R4CScraper implements ScraperAJ {
       data: { ultimaVarredura: new Date() },
     })
 
-    logger.info({ novos, atualizados, erros, pdfsNovos }, "R4C: scraping concluído")
+    logger.info({ novos, atualizados, erros, pdfsNovos }, "OnBehalf: scraping concluído")
     return { novos, atualizados, erros, pdfsNovos }
   }
 
@@ -133,39 +109,30 @@ export class R4CScraper implements ScraperAJ {
       try {
         const existing = await prisma.documento.findUnique({ where: { urlPdf: pdf.href }, select: { id: true } })
         if (existing) continue
-
         await prisma.documento.create({
           data: {
             processoId,
             urlPdf: pdf.href,
-            nomeArquivo: pdf.href.split("/").pop() ?? null,
+            nomeArquivo: decodeURIComponent(pdf.href.split("/").pop() ?? "").substring(0, 200),
             tipoDocumento: pdf.tipoDocumento,
             relevante: pdf.relevante,
             extraido: false,
-            // Não baixa o PDF aqui — extração é job separado
           },
         })
         count++
       } catch (err) {
-        logger.warn({ url: pdf.href, err: (err as Error).message }, "R4C: erro ao catalogar PDF")
+        logger.warn({ url: pdf.href, err: (err as Error).message }, "OnBehalf: erro ao catalogar PDF")
       }
     }
     return count
   }
 }
 
-// CLI standalone
+// CLI standalone: npx tsx src/scrapers/onbehalf/index.ts
 if (require.main === module) {
-  const args = process.argv.slice(2)
-  const limitArg = args.find((a) => a.startsWith("--limit="))
-  const limit = limitArg ? parseInt(limitArg.split("=")[1]) : undefined
-
-  new R4CScraper()
-    .run({ limit })
-    .then((r) => {
-      logger.info(r, "scrape:r4c finalizado")
-      process.exit(0)
-    })
+  new OnBehalfScraper()
+    .run()
+    .then((r) => { logger.info(r, "scrape:onbehalf finalizado"); process.exit(0) })
     .catch((e) => { logger.error(e); process.exit(1) })
     .finally(() => prisma.$disconnect())
 }
