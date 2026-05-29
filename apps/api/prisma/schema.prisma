@@ -308,3 +308,42 @@ model AlertaConfig {
 
   @@map("alertas_config")
 }
+
+model SolicitacaoContato {
+  id          Int       @id @default(autoincrement())
+  nome        String
+  empresa     String
+  cargo       String
+  email       String
+  whatsapp    String?
+  mensagem    String?   @db.Text
+  status      String    @default("novo") // novo, contatado, qualificado, rejeitado
+  origem      String    @default("landing")
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+  contatadoEm DateTime? @map("contatado_em")
+
+  @@index([status])
+  @@index([criadoEm(sort: Desc)])
+  @@map("solicitacoes_contato")
+}
+
+model Pagamento {
+  id              Int       @id @default(autoincrement())
+  nome            String
+  empresa         String
+  cnpj            String?
+  email           String
+  whatsapp        String?
+  asaasCustomerId String?   @map("asaas_customer_id")
+  asaasPaymentId  String?   @map("asaas_payment_id") @unique
+  metodo          String    // pix, boleto, credit_card
+  valor           Decimal   @db.Decimal(10, 2)
+  status          String    @default("pendente") // pendente, pago, expirado, cancelado
+  plano           String    @default("design_partner")
+  criadoEm        DateTime  @default(now()) @map("criado_em")
+  pagoEm          DateTime? @map("pago_em")
+
+  @@index([status])
+  @@index([criadoEm(sort: Desc)])
+  @@map("pagamentos")
+}

@@ -17,6 +17,10 @@
     "extract:pending": "tsx src/jobs/extract-pending.ts",
     "reprocessar:b": "tsx src/jobs/reprocessar-b.ts",
     "score:reprocess": "tsx src/jobs/rescore-todos.ts",
+    "cron:renovacao": "tsx src/jobs/cron-renovacao.ts",
+    "cron:alertas": "tsx src/jobs/cron-alertas.ts",
+    "cron:historico": "tsx src/jobs/cron-historico-passivo.ts",
+    "seed:planos": "tsx prisma/seed-planos.ts",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "typecheck": "tsc --noEmit"
@@ -25,6 +29,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@credor-radar/shared": "*",
     "@prisma/client": "^5.22.0",
+    "axios": "^1.16.1",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.34.0",
     "cors": "^2.8.5",
@@ -35,6 +40,7 @@
     "pdf-parse": "^1.1.1",
     "pino": "^9.5.0",
     "playwright": "^1.49.1",
+    "resend": "^6.12.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {

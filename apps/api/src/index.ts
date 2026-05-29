@@ -14,6 +14,8 @@ import { creditosRouter } from "./routes/creditos"
 import { vioesRouter } from "./routes/visoes"
 import { alertasRouter } from "./routes/alertas"
 import { adminRouter } from "./routes/admin"
+import { contatoRouter } from "./routes/contato"
+import { checkoutRouter } from "./routes/checkout"
 import "./jobs/worker"
 
 const app = express()
@@ -54,6 +56,9 @@ app.use("/api/creditos", creditosRouter)
 app.use("/api/visoes", vioesRouter)
 app.use("/api/alertas", alertasRouter)
 app.use("/api/admin", adminRouter)
+app.use("/api/contato", contatoRouter)
+app.use("/api/checkout", checkoutRouter)
+app.post("/api/webhooks/asaas", checkoutRouter)
 
 // TODO Fase auth: adicionar middleware de autenticação
 // app.use(authMiddleware)

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { auth } from "@/auth"
+import { NavCTAs, HeroCTAs, ParceiroCTAs, CTAFinalButtons } from "./components/LandingCTAs"
 
 async function getStats() {
   try {
@@ -10,7 +11,6 @@ async function getStats() {
       totalProcessos: number
       totalCredores: number
       valorTotalPassivo: string
-      processosMonitorados: number
     }>
   } catch {
     return null
@@ -58,28 +58,13 @@ export default async function HomePage() {
       {/* ── Nav ── */}
       <nav className="max-w-[1280px] mx-auto px-6 md:px-10 h-16 flex items-center justify-between">
         <span className="text-sm font-semibold tracking-tight">Jalun Capital</span>
-        <div className="flex items-center gap-4">
-          {session ? (
-            <Link href="/dashboard" className="text-sm rounded-md bg-[#0a0a0a] px-4 py-2 font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150">
-              Ir para o Dashboard →
-            </Link>
-          ) : (
-            <>
-              <a href="#parceiros" className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150 hidden md:inline">
-                Parceiros
-              </a>
-              <Link href="/login" className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150">
-                Entrar
-              </Link>
-              <a
-                href="mailto:igorbarrosrj@gmail.com?subject=Interesse%20em%20Parceria%20Fundadora%20—%20Jalun%20Capital"
-                className="text-sm rounded-md bg-[#0a2540] px-4 py-2 font-medium text-white hover:bg-[#0d3560] transition-colors duration-150"
-              >
-                Solicitar conversa →
-              </a>
-            </>
-          )}
-        </div>
+        {session ? (
+          <Link href="/dashboard" className="text-sm rounded-md bg-[#0a0a0a] px-4 py-2 font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150">
+            Ir para o Dashboard →
+          </Link>
+        ) : (
+          <NavCTAs />
+        )}
       </nav>
 
       {/* ── Hero ── */}
@@ -87,43 +72,25 @@ export default async function HomePage() {
         <p className="font-mono text-xs text-[#064e3b] uppercase tracking-[0.15em] mb-6">
           Inteligência de créditos · Recuperação Judicial
         </p>
-
         <h1 className="text-[clamp(2.5rem,6vw,5rem)] font-semibold tracking-[-0.03em] leading-[1.05] max-w-3xl">
           O Bloomberg do distressed
           <br />
           <span className="text-[#a3a3a3]">brasileiro.</span>
         </h1>
-
         <p className="mt-8 text-[1.125rem] text-[#525252] leading-relaxed max-w-xl">
           Identificamos automaticamente oportunidades de cessão de crédito
           em processos de recuperação judicial no Brasil — antes do mercado.
         </p>
 
-        <div className="mt-10 flex flex-wrap items-center gap-4">
-          {session ? (
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center rounded-md bg-[#0a0a0a] px-6 py-3 text-sm font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150"
-            >
+        {session ? (
+          <div className="mt-10">
+            <Link href="/dashboard" className="inline-flex items-center rounded-md bg-[#0a0a0a] px-6 py-3 text-sm font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150">
               Ir para o Dashboard →
             </Link>
-          ) : (
-            <>
-              <a
-                href="mailto:igorbarrosrj@gmail.com?subject=Interesse%20em%20Parceria%20Fundadora%20—%20Jalun%20Capital"
-                className="inline-flex items-center rounded-md bg-[#0a2540] px-6 py-3 text-sm font-medium text-white hover:bg-[#0d3560] transition-colors duration-150"
-              >
-                Solicitar conversa →
-              </a>
-              <Link
-                href="/login"
-                className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150"
-              >
-                Já tenho conta
-              </Link>
-            </>
-          )}
-        </div>
+          </div>
+        ) : (
+          <HeroCTAs />
+        )}
 
         <p className="mt-6 text-xs text-[#a3a3a3]">
           Para fundos de distressed, family offices e escritórios especializados.
@@ -135,21 +102,15 @@ export default async function HomePage() {
         <section className="bg-[#fafafa] border-y border-[#e5e5e5]">
           <div className="max-w-[1280px] mx-auto px-6 md:px-10 py-12 grid grid-cols-3 gap-6 md:gap-12">
             <div>
-              <div className="font-mono text-3xl md:text-4xl font-medium text-[#0a0a0a]">
-                {stats.totalProcessos.toLocaleString("pt-BR")}
-              </div>
+              <div className="font-mono text-3xl md:text-4xl font-medium text-[#0a0a0a]">{stats.totalProcessos.toLocaleString("pt-BR")}</div>
               <div className="mt-1.5 text-sm text-[#525252]">processos monitorados</div>
             </div>
             <div>
-              <div className="font-mono text-3xl md:text-4xl font-medium text-[#0a0a0a]">
-                {formatCompact(stats.valorTotalPassivo)}
-              </div>
+              <div className="font-mono text-3xl md:text-4xl font-medium text-[#0a0a0a]">{formatCompact(stats.valorTotalPassivo)}</div>
               <div className="mt-1.5 text-sm text-[#525252]">em passivo mapeado</div>
             </div>
             <div>
-              <div className="font-mono text-3xl md:text-4xl font-medium text-[#0a0a0a]">
-                {stats.totalCredores.toLocaleString("pt-BR")}
-              </div>
+              <div className="font-mono text-3xl md:text-4xl font-medium text-[#0a0a0a]">{stats.totalCredores.toLocaleString("pt-BR")}</div>
               <div className="mt-1.5 text-sm text-[#525252]">credores ranqueados</div>
             </div>
           </div>
@@ -158,26 +119,12 @@ export default async function HomePage() {
 
       {/* ── Como funciona ── */}
       <section id="como-funciona" className="max-w-[1280px] mx-auto px-6 md:px-10 py-28 md:py-36">
-        <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.03em] mb-14">
-          Como funciona
-        </h2>
+        <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.03em] mb-14">Como funciona</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            {
-              icon: <IconLupa />,
-              titulo: "Varredura automatizada",
-              desc: "Nosso sistema visita diariamente os sites dos administradores judiciais brasileiros e captura novos processos, editais e relações de credores.",
-            },
-            {
-              icon: <IconDocumento />,
-              titulo: "Extração estruturada por IA",
-              desc: "Modelos de linguagem leem PDFs jurídicos e estruturam listas de credores com classe, valor e classificação fiscal — sem trabalho manual.",
-            },
-            {
-              icon: <IconGrafico />,
-              titulo: "Score de atratividade",
-              desc: "Algoritmo proprietário ranqueia créditos por potencial de cessão, considerando classe, valor, perfil do credor e idade do processo.",
-            },
+            { icon: <IconLupa />, titulo: "Varredura automatizada", desc: "Nosso sistema visita diariamente os sites dos administradores judiciais brasileiros e captura novos processos, editais e relações de credores." },
+            { icon: <IconDocumento />, titulo: "Extração estruturada por IA", desc: "Modelos de linguagem leem PDFs jurídicos e estruturam listas de credores com classe, valor e classificação fiscal — sem trabalho manual." },
+            { icon: <IconGrafico />, titulo: "Score de atratividade", desc: "Algoritmo proprietário ranqueia créditos por potencial de cessão, considerando classe, valor, perfil do credor e idade do processo." },
           ].map((c) => (
             <div key={c.titulo} className="border border-[#e5e5e5] rounded-lg p-7">
               <div className="text-[#0a0a0a] mb-5">{c.icon}</div>
@@ -195,17 +142,8 @@ export default async function HomePage() {
             O mercado brasileiro de distressed cresce mais rápido que a informação sobre ele.
           </h2>
           <div className="space-y-5 text-[1.0625rem] text-[#525252] leading-[1.7]">
-            <p>
-              Em 2024, o mercado de NPL brasileiro envolveu dezenas de empresas cedentes.
-              Mais de 2.000 novos pedidos de recuperação judicial foram protocolados.
-              O capital institucional descobriu o Brasil como destino de distressed — fundos
-              como GDA Luma, Cerberus e Brookfield operam aqui em escala crescente.
-            </p>
-            <p>
-              Mas a informação ainda é fragmentada: editais publicados em dezenas de diários
-              oficiais, listas de credores em sites de administradores judiciais, dados estruturados
-              praticamente inexistentes. Nosso trabalho é transformar esse caos em inteligência acionável.
-            </p>
+            <p>Em 2024, o mercado de NPL brasileiro envolveu dezenas de empresas cedentes. Mais de 2.000 novos pedidos de recuperação judicial foram protocolados. O capital institucional descobriu o Brasil como destino de distressed — fundos como GDA Luma, Cerberus e Brookfield operam aqui em escala crescente.</p>
+            <p>Mas a informação ainda é fragmentada: editais publicados em dezenas de diários oficiais, listas de credores em sites de administradores judiciais, dados estruturados praticamente inexistentes. Nosso trabalho é transformar esse caos em inteligência acionável.</p>
           </div>
         </div>
       </section>
@@ -235,7 +173,6 @@ export default async function HomePage() {
       {/* ── Parceiros Fundadores ── */}
       <section id="parceiros" className="bg-[#fafafa] border-y border-[#e5e5e5]">
         <div className="max-w-[1280px] mx-auto px-6 md:px-10 py-28 md:py-36">
-
           <p className="font-mono text-xs text-[#0a2540] uppercase tracking-[0.15em] mb-4">Acesso antecipado</p>
           <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.03em] mb-4">
             Fase de Parceiros Fundadores
@@ -254,7 +191,6 @@ export default async function HomePage() {
                   Vagas limitadas
                 </span>
               </div>
-
               <div className="mb-6 pt-2">
                 <p className="text-xs font-mono uppercase tracking-widest text-[#94a3b8] mb-3">Design Partner</p>
                 <div className="flex items-baseline gap-1">
@@ -262,11 +198,7 @@ export default async function HomePage() {
                   <span className="text-sm text-[#94a3b8]">/mês</span>
                 </div>
               </div>
-
-              <p className="text-sm text-[#94a3b8] mb-6 leading-relaxed">
-                O que está disponível hoje no produto:
-              </p>
-
+              <p className="text-sm text-[#94a3b8] mb-5 leading-relaxed">O que está disponível hoje no produto:</p>
               <ul className="space-y-3 flex-1 mb-8">
                 {[
                   "Acesso completo ao banco de processos catalogados",
@@ -285,23 +217,13 @@ export default async function HomePage() {
                 ))}
               </ul>
 
-              <a
-                href="mailto:igorbarrosrj@gmail.com?subject=Interesse%20em%20Design%20Partner%20—%20Jalun%20Capital&body=Olá%2C%20tenho%20interesse%20em%20conversar%20sobre%20a%20parceria%20fundadora%20do%20Jalun%20Capital."
-                className="block text-center rounded-md bg-white text-[#0a2540] text-sm font-semibold px-5 py-3 hover:bg-[#f1f5f9] transition-colors duration-150"
-              >
-                Solicitar conversa →
-              </a>
+              <ParceiroCTAs />
             </div>
 
             {/* Roadmap */}
             <div>
-              <h3 className="text-lg font-semibold text-[#0a0a0a] mb-2">
-                Próximos recursos
-              </h3>
-              <p className="text-sm text-[#525252] mb-8 leading-relaxed">
-                Em desenvolvimento ativo para os próximos meses:
-              </p>
-
+              <h3 className="text-lg font-semibold text-[#0a0a0a] mb-2">Próximos recursos</h3>
+              <p className="text-sm text-[#525252] mb-8 leading-relaxed">Em desenvolvimento ativo para os próximos meses:</p>
               <ul className="space-y-4">
                 {[
                   "Alertas automáticos por e-mail",
@@ -318,7 +240,6 @@ export default async function HomePage() {
                   </li>
                 ))}
               </ul>
-
               <div className="mt-10 border-l-2 border-[#0a2540] pl-5">
                 <p className="text-sm text-[#0a0a0a] font-medium leading-relaxed">
                   Parceiros fundadores influenciam diretamente a priorização do roadmap.
@@ -328,7 +249,6 @@ export default async function HomePage() {
                 </p>
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -343,15 +263,8 @@ export default async function HomePage() {
             Vagas de design partner são limitadas. Uma conversa de 30 minutos
             é suficiente para avaliar se faz sentido para sua operação.
           </p>
-          <a
-            href="mailto:igorbarrosrj@gmail.com?subject=Interesse%20em%20Design%20Partner%20—%20Jalun%20Capital&body=Olá%2C%20tenho%20interesse%20em%20conversar%20sobre%20a%20parceria%20fundadora%20do%20Jalun%20Capital."
-            className="inline-flex items-center rounded-md bg-white px-7 py-3.5 text-sm font-medium text-[#0a2540] hover:bg-[#f1f5f9] transition-colors duration-150"
-          >
-            Solicitar conversa →
-          </a>
-          <p className="mt-5 text-xs text-[#64748b]">
-            Resposta em até 48h · Sem compromisso
-          </p>
+          <CTAFinalButtons />
+          <p className="mt-5 text-xs text-[#64748b]">Resposta em até 24h · Sem compromisso</p>
         </div>
       </section>
 
