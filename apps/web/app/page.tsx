@@ -1,14 +1,10 @@
 import Link from "next/link"
 import { auth } from "@/auth"
 
-// ─── Dados em tempo real via SSR ─────────────────────────────────────────────
-
 async function getStats() {
   try {
     const apiUrl = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4000"
-    const res = await fetch(`${apiUrl}/api/stats`, {
-      next: { revalidate: 60 },
-    })
+    const res = await fetch(`${apiUrl}/api/stats`, { next: { revalidate: 60 } })
     if (!res.ok) return null
     return res.json() as Promise<{
       totalProcessos: number
@@ -30,41 +26,28 @@ function formatCompact(valor: string | null): string {
   return `R$ ${(n / 1_000).toFixed(0)}K`
 }
 
-// ─── Ícones SVG minimalistas ──────────────────────────────────────────────────
-
 function IconLupa() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="8.5" cy="8.5" r="5.5" />
-      <line x1="13.5" y1="13.5" x2="18" y2="18" />
+      <circle cx="8.5" cy="8.5" r="5.5" /><line x1="13.5" y1="13.5" x2="18" y2="18" />
     </svg>
   )
 }
-
 function IconDocumento() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="2" width="12" height="16" rx="1.5" />
-      <line x1="7" y1="7" x2="13" y2="7" />
-      <line x1="7" y1="10" x2="13" y2="10" />
-      <line x1="7" y1="13" x2="10" y2="13" />
+      <rect x="4" y="2" width="12" height="16" rx="1.5" /><line x1="7" y1="7" x2="13" y2="7" /><line x1="7" y1="10" x2="13" y2="10" /><line x1="7" y1="13" x2="10" y2="13" />
     </svg>
   )
 }
-
 function IconGrafico() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="3" y1="17" x2="3" y2="3" />
-      <line x1="3" y1="17" x2="17" y2="17" />
-      <rect x="5" y="10" width="3" height="7" />
-      <rect x="10" y="6" width="3" height="11" />
-      <rect x="15" y="13" width="3" height="4" />
+      <line x1="3" y1="17" x2="3" y2="3" /><line x1="3" y1="17" x2="17" y2="17" />
+      <rect x="5" y="10" width="3" height="7" /><rect x="10" y="6" width="3" height="11" /><rect x="15" y="13" width="3" height="4" />
     </svg>
   )
 }
-
-// ─── Landing ─────────────────────────────────────────────────────────────────
 
 export default async function HomePage() {
   const [stats, session] = await Promise.all([getStats(), auth()])
@@ -74,7 +57,7 @@ export default async function HomePage() {
 
       {/* ── Nav ── */}
       <nav className="max-w-[1280px] mx-auto px-6 md:px-10 h-16 flex items-center justify-between">
-        <span className="text-sm font-semibold tracking-tight">Credor Radar</span>
+        <span className="text-sm font-semibold tracking-tight">Jalun Capital</span>
         <div className="flex items-center gap-4">
           {session ? (
             <Link href="/dashboard" className="text-sm rounded-md bg-[#0a0a0a] px-4 py-2 font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150">
@@ -82,15 +65,18 @@ export default async function HomePage() {
             </Link>
           ) : (
             <>
-              <a href="#planos" className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150 hidden md:inline">
-                Planos
+              <a href="#parceiros" className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150 hidden md:inline">
+                Parceiros
               </a>
               <Link href="/login" className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150">
                 Entrar
               </Link>
-              <Link href="/cadastro" className="text-sm rounded-md bg-[#0a0a0a] px-4 py-2 font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150">
-                Trial grátis →
-              </Link>
+              <a
+                href="mailto:igorbarrosrj@gmail.com?subject=Interesse%20em%20Parceria%20Fundadora%20—%20Jalun%20Capital"
+                className="text-sm rounded-md bg-[#0a2540] px-4 py-2 font-medium text-white hover:bg-[#0d3560] transition-colors duration-150"
+              >
+                Solicitar conversa →
+              </a>
             </>
           )}
         </div>
@@ -123,12 +109,12 @@ export default async function HomePage() {
             </Link>
           ) : (
             <>
-              <Link
-                href="/cadastro"
-                className="inline-flex items-center rounded-md bg-[#0a0a0a] px-6 py-3 text-sm font-medium text-white hover:bg-[#1a1a1a] transition-colors duration-150"
+              <a
+                href="mailto:igorbarrosrj@gmail.com?subject=Interesse%20em%20Parceria%20Fundadora%20—%20Jalun%20Capital"
+                className="inline-flex items-center rounded-md bg-[#0a2540] px-6 py-3 text-sm font-medium text-white hover:bg-[#0d3560] transition-colors duration-150"
               >
-                Começar trial gratuito →
-              </Link>
+                Solicitar conversa →
+              </a>
               <Link
                 href="/login"
                 className="text-sm text-[#525252] hover:text-[#0a0a0a] transition-colors duration-150"
@@ -144,7 +130,7 @@ export default async function HomePage() {
         </p>
       </section>
 
-      {/* ── Faixa de estatísticas ── */}
+      {/* ── Estatísticas ── */}
       {stats && (
         <section className="bg-[#fafafa] border-y border-[#e5e5e5]">
           <div className="max-w-[1280px] mx-auto px-6 md:px-10 py-12 grid grid-cols-3 gap-6 md:gap-12">
@@ -175,7 +161,6 @@ export default async function HomePage() {
         <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.03em] mb-14">
           Como funciona
         </h2>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             {
@@ -230,7 +215,6 @@ export default async function HomePage() {
         <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.03em] mb-12">
           Construído para profissionais<br className="hidden md:block" /> que operam o mercado.
         </h2>
-
         <ul className="space-y-4 max-w-lg mb-8">
           {[
             "Gestores de fundos de distressed e NPL",
@@ -245,153 +229,129 @@ export default async function HomePage() {
             </li>
           ))}
         </ul>
-
-        <p className="text-sm text-[#a3a3a3]">
-          Não é destinado a investidores pessoa física iniciantes.
-        </p>
+        <p className="text-sm text-[#a3a3a3]">Não é destinado a investidores pessoa física iniciantes.</p>
       </section>
 
-      {/* ── Planos ── */}
-      <section id="planos" className="bg-[#fafafa] border-y border-[#e5e5e5]">
+      {/* ── Parceiros Fundadores ── */}
+      <section id="parceiros" className="bg-[#fafafa] border-y border-[#e5e5e5]">
         <div className="max-w-[1280px] mx-auto px-6 md:px-10 py-28 md:py-36">
-          <p className="font-mono text-xs text-[#064e3b] uppercase tracking-[0.15em] mb-4">Planos</p>
+
+          <p className="font-mono text-xs text-[#0a2540] uppercase tracking-[0.15em] mb-4">Acesso antecipado</p>
           <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.03em] mb-4">
-            Escolha o plano certo para sua operação.
+            Fase de Parceiros Fundadores
           </h2>
           <p className="text-[#525252] text-base mb-16 max-w-xl">
-            Todos os planos incluem trial gratuito de 14 dias. Sem cartão de crédito para começar.
+            O Jalun Capital está em construção ativa. Estamos selecionando profissionais
+            do mercado de distressed para entrar cedo no produto, com condições especiais.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-12 items-start">
 
-            {/* Starter */}
-            <div className="bg-white border border-[#e5e5e5] rounded-xl p-8 flex flex-col">
-              <div className="mb-6">
-                <p className="text-xs font-mono uppercase tracking-widest text-[#a3a3a3] mb-3">Starter</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-semibold text-[#0a0a0a] tracking-tight">R$ 1.997</span>
-                  <span className="text-sm text-[#a3a3a3]">/mês</span>
-                </div>
-                <p className="text-xs text-[#a3a3a3] mt-1.5">15 análises por mês</p>
-              </div>
-              <ul className="space-y-3 flex-1 mb-8">
-                {[
-                  "Acesso a todos os processos monitorados",
-                  "Ranqueamento de credores por score",
-                  "Export CSV",
-                  "Até 3 visões salvas",
-                  "Suporte por e-mail",
-                ].map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-[#525252]">
-                    <span className="text-[#064e3b] font-medium mt-0.5 shrink-0">✓</span>
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/cadastro"
-                className="block text-center rounded-md border border-[#0a0a0a] text-[#0a0a0a] text-sm font-medium px-5 py-2.5 hover:bg-[#0a0a0a] hover:text-white transition-colors duration-150"
-              >
-                Começar trial →
-              </Link>
-            </div>
-
-            {/* Pro — destaque */}
-            <div className="bg-[#0a0a0a] rounded-xl p-8 flex flex-col relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+            {/* Card principal */}
+            <div className="bg-[#0a2540] rounded-xl p-8 flex flex-col relative">
+              <div className="absolute -top-3 left-8">
                 <span className="bg-[#064e3b] text-white text-[10px] font-mono uppercase tracking-widest px-3 py-1 rounded-full">
-                  Mais popular
+                  Vagas limitadas
                 </span>
               </div>
-              <div className="mb-6">
-                <p className="text-xs font-mono uppercase tracking-widest text-[#525252] mb-3">Pro</p>
+
+              <div className="mb-6 pt-2">
+                <p className="text-xs font-mono uppercase tracking-widest text-[#94a3b8] mb-3">Design Partner</p>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-semibold text-white tracking-tight">R$ 6.997</span>
-                  <span className="text-sm text-[#525252]">/mês</span>
+                  <span className="text-4xl font-semibold text-white tracking-tight">R$ 1.997</span>
+                  <span className="text-sm text-[#94a3b8]">/mês</span>
                 </div>
-                <p className="text-xs text-[#525252] mt-1.5">100 análises por mês</p>
               </div>
+
+              <p className="text-sm text-[#94a3b8] mb-6 leading-relaxed">
+                O que está disponível hoje no produto:
+              </p>
+
               <ul className="space-y-3 flex-1 mb-8">
                 {[
-                  "Tudo do Starter",
-                  "Análise detalhada por credor com IA",
-                  "Alertas automáticos por e-mail",
-                  "Até 20 visões salvas",
-                  "Export XLSX",
-                  "Acesso à API (10.000 req/mês)",
-                  "Suporte prioritário",
+                  "Acesso completo ao banco de processos catalogados",
+                  "Ranqueamento de credores por score de atratividade",
+                  "Análise detalhada por credor gerada por IA",
+                  "Análise de portfólio por processo com teses de operação",
+                  "Filtros por estado, classe, valor e score",
+                  "Export CSV",
+                  "Suporte direto com o founder",
+                  "Voz no roadmap do produto",
                 ].map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-[#a3a3a3]">
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-[#e2e8f0]">
                     <span className="text-[#6ee7b7] font-medium mt-0.5 shrink-0">✓</span>
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/cadastro"
-                className="block text-center rounded-md bg-white text-[#0a0a0a] text-sm font-medium px-5 py-2.5 hover:bg-[#f5f5f5] transition-colors duration-150"
+
+              <a
+                href="mailto:igorbarrosrj@gmail.com?subject=Interesse%20em%20Design%20Partner%20—%20Jalun%20Capital&body=Olá%2C%20tenho%20interesse%20em%20conversar%20sobre%20a%20parceria%20fundadora%20do%20Jalun%20Capital."
+                className="block text-center rounded-md bg-white text-[#0a2540] text-sm font-semibold px-5 py-3 hover:bg-[#f1f5f9] transition-colors duration-150"
               >
-                Começar trial →
-              </Link>
+                Solicitar conversa →
+              </a>
             </div>
 
-            {/* Enterprise */}
-            <div className="bg-white border border-[#e5e5e5] rounded-xl p-8 flex flex-col">
-              <div className="mb-6">
-                <p className="text-xs font-mono uppercase tracking-widest text-[#a3a3a3] mb-3">Enterprise</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-semibold text-[#0a0a0a] tracking-tight">R$ 19.997</span>
-                  <span className="text-sm text-[#a3a3a3]">/mês</span>
-                </div>
-                <p className="text-xs text-[#a3a3a3] mt-1.5">500 análises por mês</p>
-              </div>
-              <ul className="space-y-3 flex-1 mb-8">
+            {/* Roadmap */}
+            <div>
+              <h3 className="text-lg font-semibold text-[#0a0a0a] mb-2">
+                Próximos recursos
+              </h3>
+              <p className="text-sm text-[#525252] mb-8 leading-relaxed">
+                Em desenvolvimento ativo para os próximos meses:
+              </p>
+
+              <ul className="space-y-4">
                 {[
-                  "Tudo do Pro",
-                  "Visões ilimitadas",
-                  "API sem limite de requisições",
-                  "Webhooks em tempo real",
-                  "SLA garantido",
-                  "Gerente de conta dedicado",
-                ].map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-[#525252]">
-                    <span className="text-[#064e3b] font-medium mt-0.5 shrink-0">✓</span>
-                    <span>{f}</span>
+                  "Alertas automáticos por e-mail",
+                  "Exportação semanal automatizada em XLSX",
+                  "Cobertura nacional — mais administradores judiciais",
+                  "Visões salvas personalizadas",
+                  "Timeline narrativa por processo",
+                  "API e webhooks para integração",
+                  "Análise comparativa de casos similares",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-sm text-[#525252]">
+                    <span className="shrink-0 mt-0.5 text-[#0a2540] font-bold">→</span>
+                    <span>{item}</span>
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/cadastro"
-                className="block text-center rounded-md border border-[#0a0a0a] text-[#0a0a0a] text-sm font-medium px-5 py-2.5 hover:bg-[#0a0a0a] hover:text-white transition-colors duration-150"
-              >
-                Falar com o time →
-              </Link>
+
+              <div className="mt-10 border-l-2 border-[#0a2540] pl-5">
+                <p className="text-sm text-[#0a0a0a] font-medium leading-relaxed">
+                  Parceiros fundadores influenciam diretamente a priorização do roadmap.
+                </p>
+                <p className="text-xs text-[#a3a3a3] mt-1">
+                  Cada parceiro tem acesso direto ao founder para discutir necessidades reais da operação.
+                </p>
+              </div>
             </div>
 
           </div>
-
-          <p className="text-center text-xs text-[#a3a3a3] mt-10">
-            Precisa de volume maior ou integração customizada?{" "}
-            <span className="underline cursor-pointer hover:text-[#525252] transition-colors">Fale conosco</span>.
-          </p>
         </div>
       </section>
 
       {/* ── CTA final ── */}
-      <section className="bg-[#0a0a0a]">
+      <section className="bg-[#0a2540]">
         <div className="max-w-[1280px] mx-auto px-6 md:px-10 py-24 md:py-32 text-center">
           <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.03em] text-white mb-4">
-            Comece a operar com mais inteligência.
+            Entre cedo. Molde o produto.
           </h2>
-          <p className="text-[#a3a3a3] text-base mb-10">
-            Trial gratuito de 14 dias. Sem cartão de crédito.
+          <p className="text-[#94a3b8] text-base mb-10 max-w-lg mx-auto">
+            Vagas de design partner são limitadas. Uma conversa de 30 minutos
+            é suficiente para avaliar se faz sentido para sua operação.
           </p>
-          <Link
-            href="/cadastro"
-            className="inline-flex items-center rounded-md bg-white px-7 py-3.5 text-sm font-medium text-[#0a0a0a] hover:bg-[#f5f5f5] transition-colors duration-150"
+          <a
+            href="mailto:igorbarrosrj@gmail.com?subject=Interesse%20em%20Design%20Partner%20—%20Jalun%20Capital&body=Olá%2C%20tenho%20interesse%20em%20conversar%20sobre%20a%20parceria%20fundadora%20do%20Jalun%20Capital."
+            className="inline-flex items-center rounded-md bg-white px-7 py-3.5 text-sm font-medium text-[#0a2540] hover:bg-[#f1f5f9] transition-colors duration-150"
           >
-            Começar trial gratuito →
-          </Link>
+            Solicitar conversa →
+          </a>
+          <p className="mt-5 text-xs text-[#64748b]">
+            Resposta em até 48h · Sem compromisso
+          </p>
         </div>
       </section>
 
@@ -399,17 +359,21 @@ export default async function HomePage() {
       <footer className="border-t border-[#e5e5e5]">
         <div className="max-w-[1280px] mx-auto px-6 md:px-10 py-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div>
-            <div className="text-sm font-semibold text-[#0a0a0a]">Credor Radar</div>
+            <div className="text-sm font-semibold text-[#0a0a0a]">Jalun Capital</div>
             <div className="text-xs text-[#a3a3a3] mt-0.5">Inteligência de crédito em recuperação judicial</div>
           </div>
-
           <div className="flex flex-wrap gap-5 text-xs text-[#525252]">
             {["Sobre", "Contato", "Termos", "Privacidade"].map((l) => (
               <span key={l} className="hover:text-[#0a0a0a] cursor-pointer transition-colors">{l}</span>
             ))}
           </div>
-
-          <div className="text-xs text-[#a3a3a3]">© {new Date().getFullYear()} Credor Radar</div>
+          <div className="text-right">
+            <div className="text-xs text-[#a3a3a3]">© {new Date().getFullYear()} Jalun Capital</div>
+            <div className="text-xs text-[#c4c4c4] mt-1 max-w-xs">
+              Produto em fase de construção ativa. Recursos sendo expandidos continuamente.
+              Fale com o founder para entender o estágio atual.
+            </div>
+          </div>
         </div>
       </footer>
 
