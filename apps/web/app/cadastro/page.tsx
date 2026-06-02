@@ -69,7 +69,7 @@ export default function CadastroPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <Link href="/" className="text-base font-semibold tracking-tight text-[#0a0a0a]">
-            Credor Radar
+            Jalun Capital
           </Link>
           <p className="mt-1 text-sm text-[#525252]">Trial gratuito · 14 dias · 5 créditos incluídos</p>
         </div>

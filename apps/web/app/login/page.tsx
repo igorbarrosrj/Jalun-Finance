@@ -59,7 +59,7 @@ function LoginForm() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <span className="text-base font-semibold tracking-tight text-[#0a0a0a]">
-            Credor Radar
+            Jalun Capital
           </span>
           <p className="mt-1 text-sm text-[#525252]">
             Acesse sua conta para continuar

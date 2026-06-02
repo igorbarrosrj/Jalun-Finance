@@ -162,7 +162,7 @@ function PainelNovidades() {
   return (
     <div className="mb-6 border border-gray-100 rounded-lg overflow-hidden">
       <div className="bg-gray-50 border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-700">Esta semana no Credor Radar</h2>
+        <h2 className="text-sm font-semibold text-gray-700">Esta semana no Jalun Capital</h2>
         <span className="text-xs text-gray-400">últimos 7 dias</span>
       </div>
 

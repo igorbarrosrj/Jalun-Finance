@@ -186,7 +186,7 @@ function GlossarioModal({ onFechar }: { onFechar: () => void }) {
         <div className="flex items-center justify-between px-4 py-3 sm:p-5 border-b border-gray-100">
           <div>
             <h3 className="font-semibold text-gray-900 text-sm">Como funciona</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Termos e métricas do Credor Radar</p>
+            <p className="text-xs text-gray-400 mt-0.5">Termos e métricas do Jalun Capital</p>
           </div>
           <button onClick={onFechar} className="text-gray-400 hover:text-gray-700 text-xl p-1">×</button>
         </div>
