@@ -23,27 +23,30 @@ const AdministradorSchema = z.object({
   telefone: z.string().nullable(),
 })
 
+const CLASSES_VALIDAS = ["I_trabalhista", "II_garantia_real", "III_quirografario", "IV_me_epp", "extraconcursal"] as const
+
 const CredorSchema = z.object({
   nome: z.string(),
   documento: z.string().nullable(),
-  valor: z.number(),
+  // Tolerante: valor pode vir como string do Claude, ou estar ausente em linhas de rodapé
+  valor: z.union([z.number(), z.string().transform(Number)]).pipe(z.number()).optional().default(0),
   moeda: z.string().default("BRL"),
-  classe: z.enum([
-    "I_trabalhista",
-    "II_garantia_real",
-    "III_quirografario",
-    "IV_me_epp",
-    "extraconcursal",
-  ]),
-  posicao_lista: z.number(),
+  // Tolerante: classe pode estar ausente em linhas incompletas
+  classe: z.enum(CLASSES_VALIDAS).optional(),
+  posicao_lista: z.number().optional().default(0),
 })
 
+// Credor válido = tem nome, valor > 0 e classe reconhecida
+function credorValido(c: z.infer<typeof CredorSchema>): boolean {
+  return !!c.nome?.trim() && (c.valor ?? 0) > 0 && CLASSES_VALIDAS.includes(c.classe as typeof CLASSES_VALIDAS[number])
+}
+
 const TotaisSchema = z.object({
-  I: z.number().default(0),
-  II: z.number().default(0),
-  III: z.number().default(0),
-  IV: z.number().default(0),
-  extraconcursal: z.number().default(0),
+  I: z.number().nullish().transform((v) => v ?? 0),
+  II: z.number().nullish().transform((v) => v ?? 0),
+  III: z.number().nullish().transform((v) => v ?? 0),
+  IV: z.number().nullish().transform((v) => v ?? 0),
+  extraconcursal: z.number().nullish().transform((v) => v ?? 0),
 })
 
 const ExtractionResultSchema = z.object({
@@ -68,29 +71,41 @@ const ErroSchema = z.object({
 })
 
 type ExtractionResultRaw = z.infer<typeof ExtractionResultSchema>
-export type ExtractionResult = Omit<ExtractionResultRaw, "totais_por_classe"> & {
+export type ExtractionResult = Omit<ExtractionResultRaw, "totais_por_classe" | "credores"> & {
+  credores: CredorExtraido[]
   totais_por_classe: { I: number; II: number; III: number; IV: number; extraconcursal: number }
 }
 
 function calcularTotais(credores: z.infer<typeof CredorSchema>[]): ExtractionResult["totais_por_classe"] {
   const t = { I: 0, II: 0, III: 0, IV: 0, extraconcursal: 0 }
   for (const c of credores) {
-    if (c.classe === "I_trabalhista") t.I += c.valor
-    else if (c.classe === "II_garantia_real") t.II += c.valor
-    else if (c.classe === "III_quirografario") t.III += c.valor
-    else if (c.classe === "IV_me_epp") t.IV += c.valor
-    else if (c.classe === "extraconcursal") t.extraconcursal += c.valor
+    const v = c.valor ?? 0
+    if (c.classe === "I_trabalhista") t.I += v
+    else if (c.classe === "II_garantia_real") t.II += v
+    else if (c.classe === "III_quirografario") t.III += v
+    else if (c.classe === "IV_me_epp") t.IV += v
+    else if (c.classe === "extraconcursal") t.extraconcursal += v
   }
   return t
 }
 
 function normalizar(raw: ExtractionResultRaw): ExtractionResult {
+  // Filtra credores incompletos (rodapé, totalizadores, linhas sem valor/classe)
+  const credoresValidos = raw.credores.filter(credorValido) as unknown as CredorExtraido[]
+  const descartados = raw.credores.length - credoresValidos.length
+  if (descartados > 0) logger.warn({ descartados, total: raw.credores.length }, "Credores incompletos descartados")
   return {
     ...raw,
-    totais_por_classe: raw.totais_por_classe ?? calcularTotais(raw.credores),
+    credores: credoresValidos,
+    totais_por_classe: raw.totais_por_classe ?? calcularTotais(credoresValidos),
   }
 }
-export type CredorExtraido = z.infer<typeof CredorSchema>
+// Tipo para credores já validados (sempre têm valor, classe e posicao_lista)
+export type CredorExtraido = Omit<z.infer<typeof CredorSchema>, "valor" | "classe" | "posicao_lista"> & {
+  valor: number
+  classe: typeof CLASSES_VALIDAS[number]
+  posicao_lista: number
+}
 
 // ─── Prompt ──────────────────────────────────────────────────────────────────
 
@@ -104,7 +119,8 @@ REGRAS CRÍTICAS:
 3. Se um campo não estiver claro no documento, use null — NUNCA invente dados
 4. Documentos que NÃO sejam lista de credores devem retornar: {"erro": "tipo_documento_diferente", "tipo_detectado": "descreva o tipo"}
 5. Classes de credores: I_trabalhista, II_garantia_real, III_quirografario, IV_me_epp, extraconcursal
-6. CRÍTICO: o JSON deve estar 100% completo — feche todos os arrays e objetos antes de terminar`
+6. CRÍTICO: o JSON deve estar 100% completo — feche todos os arrays e objetos antes de terminar
+7. TOTALIZADORES NÃO SÃO CREDORES: Se uma linha representar TOTAL ou AGREGAÇÃO de uma classe (ex: "Classe I - Trabalhista", "Classe III - Quirografário", "Total Geral", "Subtotal", "Consolidado"), NÃO a inclua em credores[]. Use esses valores apenas para preencher totais_por_classe. Credores são exclusivamente pessoas físicas ou jurídicas individuais com nome próprio e CPF/CNPJ específico.`
 
 const buildUserPrompt = (texto: string, contextoProcesso?: string): string => {
   const ctx = contextoProcesso ? `\n\nContexto do processo: ${contextoProcesso}` : ""
@@ -139,6 +155,14 @@ TEXTO DO DOCUMENTO:
 ${texto}`
 }
 
+// ─── Rate limit config ────────────────────────────────────────────────────────
+
+export const RATE_LIMIT = {
+  DELAY_ENTRE_CHUNKS_MS: 8_000,   // 8s entre chunks do mesmo doc
+  DELAY_ENTRE_DOCS_MS:   10_000,  // 10s entre documentos diferentes
+  RETRY_BACKOFF_MS:      [30_000, 60_000, 120_000] as const, // 3 tentativas: 30s→60s→120s
+}
+
 // ─── Extração por chunk ───────────────────────────────────────────────────────
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -157,9 +181,8 @@ const extrairChunk = async (texto: string, contexto?: string, tentativa = 1): Pr
     const msg = String(err)
     const is429 = msg.includes("429") || msg.includes("rate_limit")
     const is529 = msg.includes("529") || msg.includes("overloaded")
-    if ((is429 || is529) && tentativa <= 4) {
-      // Backoff: 60s, 90s, 120s, 180s
-      const espera = [60_000, 90_000, 120_000, 180_000][tentativa - 1]
+    if ((is429 || is529) && tentativa <= RATE_LIMIT.RETRY_BACKOFF_MS.length) {
+      const espera = RATE_LIMIT.RETRY_BACKOFF_MS[tentativa - 1]
       logger.warn({ tentativa, espera: espera / 1000 }, `Rate limit — aguardando ${espera / 1000}s antes de retry`)
       await sleep(espera)
       return extrairChunk(texto, contexto, tentativa + 1)
@@ -217,12 +240,13 @@ const mergeResultados = (chunks: ExtractionResult[]): ExtractionResult => {
   const totais: ExtractionResult["totais_por_classe"] = { I: 0, II: 0, III: 0, IV: 0, extraconcursal: 0 }
 
   for (const c of credoresUnicos) {
-    const classeNum = c.classe.split("_")[0]
-    if (classeNum === "I") totais.I += c.valor
-    else if (classeNum === "II") totais.II += c.valor
-    else if (classeNum === "III") totais.III += c.valor
-    else if (classeNum === "IV") totais.IV += c.valor
-    else if (c.classe === "extraconcursal") totais.extraconcursal += c.valor
+    const classeNum = (c.classe ?? "").split("_")[0]
+    const v = c.valor ?? 0
+    if (classeNum === "I") totais.I += v
+    else if (classeNum === "II") totais.II += v
+    else if (classeNum === "III") totais.III += v
+    else if (classeNum === "IV") totais.IV += v
+    else if (c.classe === "extraconcursal") totais.extraconcursal += v
   }
 
   return { ...base, credores: credoresUnicos, totais_por_classe: totais }
@@ -258,18 +282,22 @@ export const extrairListaCredores = async (
 
       const parsed = ExtractionResultSchema.safeParse(raw)
       if (!parsed.success) {
-        logger.error({ zodErrors: parsed.error.flatten(), raw }, "Falha na validação Zod")
+        logger.error({ zodErrors: parsed.error.flatten() }, "Falha na validação Zod")
         return { success: false, erro: `Validação falhou: ${parsed.error.message}` }
       }
 
       const data = normalizar(parsed.data)
+      if (data.credores.length === 0) {
+        return { success: false, erro: "Nenhum credor válido extraído do documento" }
+      }
       logger.info({ credores: data.credores.length }, "Extração concluída com sucesso")
       return { success: true, data }
     }
 
-    // PDF grande: processar em chunks
+    // PDF grande: processar em chunks com delay para respeitar 8k output tokens/min
     const resultados: ExtractionResult[] = []
     for (let i = 0; i < chunks.length; i++) {
+      if (i > 0) await sleep(RATE_LIMIT.DELAY_ENTRE_CHUNKS_MS)
       logger.info({ chunk: i + 1, total: chunks.length }, "Processando chunk")
       const raw = await extrairChunk(chunks[i], contextoProcesso)
       const parsed = ExtractionResultSchema.safeParse(raw)
