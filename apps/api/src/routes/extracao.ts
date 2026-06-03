@@ -250,3 +250,18 @@ extracaoRouter.get("/", async (req, res): Promise<void> => {
 
   res.json({ data: solicitacoes, total, pagina: q.data.pagina, totalPaginas: Math.ceil(total / q.data.por_pagina) })
 })
+
+// ─── GET /api/extracao/status — polling fallback para o hook SSE ──────────────
+extracaoRouter.get("/status", async (req, res): Promise<void> => {
+  const email = req.query["email"] as string
+  if (!email) { res.status(400).json({ erro: "email obrigatório" }); return }
+  const usuario = await prisma.usuario.findUnique({ where: { email } })
+  if (!usuario) { res.status(404).json({ erro: "Usuário não encontrado" }); return }
+  const solicitacoes = await prisma.solicitacaoExtracao.findMany({
+    where: { usuarioId: usuario.id },
+    orderBy: { criadoEm: "desc" },
+    take: 50,
+    include: { processo: { select: { id: true, numeroProcesso: true, recuperandaRazaoSocial: true, estado: true } } },
+  })
+  res.json({ solicitacoes })
+})
