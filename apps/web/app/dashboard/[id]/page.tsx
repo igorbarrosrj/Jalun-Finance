@@ -427,7 +427,23 @@ function BlocoAnalise({
 
         {docsRelevantes.length === 0 ? (
           <div className="text-center space-y-3">
-            {buscaEnviada ? (
+            {processo.aj.urlBase === "https://www.onbehalfbrasil.com.br" ? (
+              <div className="rounded-lg border border-amber-100 bg-amber-50 px-5 py-4 text-center">
+                <p className="text-sm font-medium text-amber-800">Documentos protegidos por senha</p>
+                <p className="text-xs text-amber-600 mt-1">
+                  O portal OnBehalf restringe o acesso aos documentos deste processo a credores cadastrados.
+                  Entre em contato diretamente com o AJ para obter acesso.
+                </p>
+                <a
+                  href={processo.aj.urlBase}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block mt-3 text-xs text-amber-700 underline hover:text-amber-900"
+                >
+                  Acessar portal OnBehalf →
+                </a>
+              </div>
+            ) : buscaEnviada ? (
               <div className="inline-flex flex-col items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-6 py-4">
                 <span className="text-blue-500 text-2xl animate-spin">⟳</span>
                 <p className="text-sm font-medium text-blue-800">Buscando novos documentos…</p>
